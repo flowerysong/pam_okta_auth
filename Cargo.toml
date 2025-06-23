@@ -1,0 +1,20 @@
+[package]
+name = "pam_okta_auth"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+description = "PAM module for Okta"
+repository = "https://github.com/flowerysong/pam_okta_auth"
+
+[dependencies]
+pamsm = { version = "0.5", features = ["libpam"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = { version = "0.8", features = ["parse"], default-features = false }
+ureq = { version = "3.0", features = ["json", "rustls"], default-features = false }
+uzers = { version = "0.12", default-features = false }
+
+[lib]
+name = "pam_okta_auth"
+path = "src/pam_okta_auth.rs"
+crate-type = ["cdylib", "lib"]
