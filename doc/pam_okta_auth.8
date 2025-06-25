@@ -1,0 +1,60 @@
+.Dd 2025-06-25
+.Dt PAM_OKTA_AUTH 8
+.Os pam_okta_auth 0.0.1
+
+.Sh NAME
+.Nm pam_okta_auth
+.Nd PAM module for Okta
+
+.Sh SYNOPSIS
+.Nm pam_okta_auth.so
+.Op Cm config_file= Ns Ar FILENAME
+.Op Cm password_auth
+.Op Cm try_first_pass
+.Op Cm use_first_pass
+
+.Sh DESCRIPTION
+.Nm
+authenticates users against the Okta authentication service.
+
+.Sh OPTIONS
+
+.Bl -tag -width Ds
+.It config_file= Ns Ar FILENAME
+Specify a config file to load instead of
+.Pa /etc/security/pam_okta_auth.toml
+
+.It password_auth
+Perform primary authentication against Okta before prompting for a
+secondary factor.
+
+.It try_first_pass
+Before prompting the user for a password, attempt authentication using one
+supplied to a prior module in the stack if possible.
+
+.It use_first_pass
+Use the password supplied to a prior module instead of prompting.
+If none is available, authentication will fail.
+
+.Sh CONFIGURATION OPTIONS
+
+.Bl -tag -width Ds
+.It host
+Okta tenant hostname (required)
+
+.It client_id
+OAuth2 client ID (required)
+
+.It client_secret
+OAuth2 client secret (required)
+
+.It bypass_groups
+List of groups whose members are not required to provide a secondary factor.
+This setting does not affect primary authentication if that is enabled.
+
+.Sh SEE ALSO
+.Bl -item
+.It
+.Xr PAM 8
+.It
+.Xr pam.conf 5

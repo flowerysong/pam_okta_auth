@@ -18,3 +18,7 @@ uzers = { version = "0.12", default-features = false }
 name = "pam_okta_auth"
 path = "src/pam_okta_auth.rs"
 crate-type = ["cdylib", "lib"]
+
+[profile.rpm]
+inherits = "release"
+strip = "none"
