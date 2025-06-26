@@ -1,3 +1,7 @@
+%global selinuxtype targeted
+%global moduletype contrib
+%global modulename pam_okta_auth
+
 %define _debugsource_template %{nil}
 %global rawversion 0.1.1-alpha.1
 
@@ -13,9 +17,22 @@ URL: https://github.com/flowerysong/pam_okta_auth
 Source: %{name}-%{rawversion}.crate
 BuildRequires: pam-devel
 BuildRequires: rust-toolset
+BuildRequires: selinux-policy-devel
+Requires: (%{name}-selinux if selinux-policy-%{selinuxtype})
 
 %description
 PAM module for Okta.
+
+%package selinux
+Summary: SELinux rules for %{name}
+BuildArch: noarch
+Requires: selinux-policy-%{selinuxtype}
+Requires(post): selinux-policy-%{selinuxtype}
+Requires: pam_okta_auth%{?_isa} = %{version}-%{release}
+%{?selinux_requires}
+
+%description selinux
+%{summary}.
 
 %prep
 %autosetup -n %{name}-%{rawversion} -p1
@@ -28,7 +45,7 @@ make TARGET_PROFILE=rpm
     TARGET_PROFILE=rpm \
     prefix=%{_prefix} \
     libdir=%{_libdir} \
-    mandir=%{_mandir}
+    datarootdir=%{_datarootdir}
 
 %files
 %license COPYING COPYING.dependencies
@@ -36,6 +53,23 @@ make TARGET_PROFILE=rpm
 %{_mandir}/man8/pam_okta_auth.8*
 %defattr(-,root,root)
 %{_libdir}/security/pam_okta_auth.so
+
+%files selinux
+%{_datadir}/selinux/packages/%{modulename}.pp.bz2
+
+%pre selinux
+%selinux_relabel_pre -s %{selinuxtype}
+
+%post selinux
+%selinux_modules_install %{_datadir}/selinux/packages/%{modulename}.pp.bz2
+
+%postun selinux
+if [ $1 -eq 0 ]; then
+    %selinux_modules_uninstall %{_datadir}/selinux/packages/%{modulename}.pp.bz2
+fi
+
+%posttrans selinux
+%selinux_relabel_post -s %{selinuxtype}
 
 %changelog
 * %(date "+%a %b %d %Y") (Automated RPM build) - %{version}-%{release}

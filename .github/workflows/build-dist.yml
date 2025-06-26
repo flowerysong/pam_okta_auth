@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install build deps
-        run: dnf install -y make pam-devel rpmdevtools rust-toolset
+        run: dnf install -y make pam-devel rpmdevtools rust-toolset selinux-policy-devel
 
       - name: Build RPM
         run: make rpm
@@ -26,6 +26,7 @@ jobs:
         with:
           name: el${{ matrix.el_version }}
           path: |
+            ~/rpmbuild/RPMS/noarch/*
             ~/rpmbuild/RPMS/x86_64/*
             ~/rpmbuild/SRPMS/*
 
