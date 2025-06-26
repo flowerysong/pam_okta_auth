@@ -1,0 +1,55 @@
+name: build-dist
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  build-el:
+    strategy:
+      matrix:
+        el_version: [8, 9]
+    runs-on: ubuntu-latest
+    container: almalinux:${{ matrix.el_version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: dnf install -y make pam-devel rpmdevtools rust-toolset
+
+      - name: Build RPM
+        run: make rpm
+
+      - name: Upload RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: el${{ matrix.el_version }}
+          path: |
+            ~/rpmbuild/RPMS/x86_64/*
+            ~/rpmbuild/SRPMS/*
+
+  build-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+          sudo apt update
+          sudo apt install libpam-dev make nfpm rust-all
+
+      - name: Build .deb
+        run: |
+          make deb
+          make package
+
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: |
+            deb/*
+            target/package/*.crate
