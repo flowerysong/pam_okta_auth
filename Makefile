@@ -30,3 +30,7 @@ package:
 
 rpm: package
 	rpmbuild -ta target/package/pam_okta_auth-0.0.2-alpha.1.crate
+
+deb: build
+	mkdir -p deb
+	nfpm package -p deb -f packaging/deb/nfpm.yaml -t deb
