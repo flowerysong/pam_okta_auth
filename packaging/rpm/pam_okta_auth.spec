@@ -2,7 +2,10 @@
 %global moduletype contrib
 %global modulename pam_okta_auth
 
+%if 0%{?rhel} < 10
 %define _debugsource_template %{nil}
+%endif
+
 %global rawversion 0.1.1-alpha.1
 
 Name: pam_okta_auth

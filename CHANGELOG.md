@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 ### Fixed
+- RPM build issues on RHEL 10
 
 ## [0.1.0](https://github.com/flowerysong/pam_okta_auth/releases/tag/v0.1.0) - 2025-06-26
 
