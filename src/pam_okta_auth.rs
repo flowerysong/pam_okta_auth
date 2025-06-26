@@ -62,6 +62,11 @@ fn log_info(pamh: &Pam, msg: &str) {
     let _ = pamh.syslog(LogLvl::INFO, msg);
 }
 
+fn send_info(pamh: &Pam, msg: &str) {
+    log_info(pamh, msg);
+    let _ = pamh.conv(Some(msg), PamMsgStyle::TEXT_INFO);
+}
+
 fn factor_otp(pamh: &Pam, conf: &OktaConfig, username: &str, otp: &str) -> PamError {
     log_info(
         pamh,
@@ -78,8 +83,14 @@ fn factor_otp(pamh: &Pam, conf: &OktaConfig, username: &str, otp: &str) -> PamEr
         ("otp", otp),
     ];
     match ureq::post(&url).send_form(form_data) {
-        Ok(_) => PamError::SUCCESS,
-        Err(e) => log_error(pamh, &e),
+        Ok(_) => {
+            send_info(pamh, "OTP authentication succeeded");
+            PamError::SUCCESS
+        }
+        Err(e) => {
+            send_info(pamh, "OTP authentication failed");
+            log_error(pamh, &e)
+        }
     }
 }
 
@@ -98,8 +109,14 @@ fn factor_password(pamh: &Pam, conf: &OktaConfig, username: &str, password: &str
         ("password", password),
     ];
     match ureq::post(&url).send_form(form_data) {
-        Ok(_) => PamError::SUCCESS,
-        Err(e) => log_error(pamh, &e),
+        Ok(_) => {
+            send_info(pamh, "Password authentication succeeded");
+            PamError::SUCCESS
+        }
+        Err(e) => {
+            send_info(pamh, "Password authentication failed");
+            log_error(pamh, &e)
+        }
     }
 }
 
@@ -125,7 +142,7 @@ fn factor_push(pamh: &Pam, conf: &OktaConfig, username: &str) -> PamError {
         Err(e) => return log_error(pamh, &e),
     };
 
-    log_info(pamh, "Successfully initiated push");
+    send_info(pamh, "Successfully initiated Okta push");
 
     let now = std::time::Instant::now();
     let token_url = format!("https://{}/oauth2/v1/token", conf.host);
@@ -144,11 +161,12 @@ fn factor_push(pamh: &Pam, conf: &OktaConfig, username: &str) -> PamError {
     while now.elapsed().as_secs() <= timeout {
         std::thread::sleep(interval);
         if ureq::post(&token_url).send_form(form_data).is_ok() {
+            send_info(pamh, "Push acknowledged");
             return PamError::SUCCESS;
         }
     }
 
-    log_info(pamh, "Timed out waiting for acknowledgment");
+    send_info(pamh, "Timed out waiting for acknowledgment");
     PamError::AUTHINFO_UNAVAIL
 }
 

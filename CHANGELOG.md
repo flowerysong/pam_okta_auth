@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - SELinux support
+- Additional visible indicators of authentication progress
 
 ### Changed
 
