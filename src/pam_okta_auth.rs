@@ -3,6 +3,7 @@
  * See COPYING.
  */
 
+#[rustfmt::skip]
 use pamsm::{
     LogLvl,
     Pam,
@@ -42,7 +43,7 @@ fn check_bypass_groups(pamh: &Pam, conf: &OktaConfig, username: &str) -> Option<
                     }
                 }
             }
-        },
+        }
         None => return Some(PamError::USER_UNKNOWN),
     }
     None
@@ -50,7 +51,7 @@ fn check_bypass_groups(pamh: &Pam, conf: &OktaConfig, username: &str) -> Option<
 
 fn log_error(pamh: &Pam, error: &dyn std::error::Error) -> PamError {
     match pamh.syslog(LogLvl::NOTICE, &format!("Error: {}", error)) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => return e,
     }
 
@@ -62,7 +63,10 @@ fn log_info(pamh: &Pam, msg: &str) {
 }
 
 fn factor_otp(pamh: &Pam, conf: &OktaConfig, username: &str, otp: &str) -> PamError {
-    log_info(pamh, &format!("Attempting OTP authentication for {username}"));
+    log_info(
+        pamh,
+        &format!("Attempting OTP authentication for {username}"),
+    );
 
     let url = format!("https://{}/oauth2/v1/token", conf.host);
     let form_data = [
@@ -80,7 +84,10 @@ fn factor_otp(pamh: &Pam, conf: &OktaConfig, username: &str, otp: &str) -> PamEr
 }
 
 fn factor_password(pamh: &Pam, conf: &OktaConfig, username: &str, password: &str) -> PamError {
-    log_info(pamh, &format!("Attempting password authentication for {username}"));
+    log_info(
+        pamh,
+        &format!("Attempting password authentication for {username}"),
+    );
     let url = format!("https://{}/oauth2/v1/token", conf.host);
     let form_data = [
         ("client_id", conf.client_id.as_str()),
@@ -97,7 +104,10 @@ fn factor_password(pamh: &Pam, conf: &OktaConfig, username: &str, password: &str
 }
 
 fn factor_push(pamh: &Pam, conf: &OktaConfig, username: &str) -> PamError {
-    log_info(pamh, &format!("Attempting push authentication for {username}"));
+    log_info(
+        pamh,
+        &format!("Attempting push authentication for {username}"),
+    );
 
     let push_url = format!("https://{}/oauth2/v1/oob-authenticate", conf.host);
     let form_data = [
@@ -159,21 +169,17 @@ impl PamServiceModule for PamOkta {
 
         for arg in args {
             match arg.split_once("=") {
-                Some((k, v)) => {
-                    match k {
-                        "config_file" => {
-                            conf_path = String::from(v);
-                        },
-                        _ => log_info(&pamh, &format!("Unknown PAM argument: {arg}")),
+                Some((k, v)) => match k {
+                    "config_file" => {
+                        conf_path = String::from(v);
                     }
+                    _ => log_info(&pamh, &format!("Unknown PAM argument: {arg}")),
                 },
-                None => {
-                    match arg.as_str() {
-                        "password_auth" => password_auth = true,
-                        "try_first_pass" => try_first_pass = true,
-                        "use_first_pass" => use_first_pass = true,
-                        _ => log_info(&pamh, &format!("Unknown PAM argument: {arg}")),
-                    }
+                None => match arg.as_str() {
+                    "password_auth" => password_auth = true,
+                    "try_first_pass" => try_first_pass = true,
+                    "use_first_pass" => use_first_pass = true,
+                    _ => log_info(&pamh, &format!("Unknown PAM argument: {arg}")),
                 },
             }
         }
@@ -199,11 +205,12 @@ impl PamServiceModule for PamOkta {
                 }
             }
             if password_auth {
-                let password = match pamh.conv(Some("Okta password: "), PamMsgStyle::PROMPT_ECHO_OFF) {
-                    Ok(Some(pass)) => pass.to_str().unwrap_or(""),
-                    Ok(_) => "",
-                    Err(e) => return e,
-                };
+                let password =
+                    match pamh.conv(Some("Okta password: "), PamMsgStyle::PROMPT_ECHO_OFF) {
+                        Ok(Some(pass)) => pass.to_str().unwrap_or(""),
+                        Ok(_) => "",
+                        Err(e) => return e,
+                    };
                 let res = factor_password(&pamh, &conf, username, password);
                 if res != PamError::SUCCESS {
                     return res;
