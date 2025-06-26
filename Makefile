@@ -29,4 +29,4 @@ package:
 	cargo package --no-verify
 
 rpm: package
-	rpmbuild -ta target/package/pam_okta_auth-*.crate
+	rpmbuild -ta target/package/pam_okta_auth-0.0.2-alpha.1.crate

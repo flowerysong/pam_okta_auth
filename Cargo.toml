@@ -1,10 +1,11 @@
 [package]
 name = "pam_okta_auth"
-version = "0.0.1"
+version = "0.0.2-alpha.1"
 edition = "2021"
 license = "MIT"
 description = "PAM module for Okta"
 repository = "https://github.com/flowerysong/pam_okta_auth"
+publish = false
 
 [dependencies]
 pamsm = { version = "0.5", features = ["libpam"] }
@@ -22,3 +23,13 @@ crate-type = ["cdylib", "lib"]
 [profile.rpm]
 inherits = "release"
 strip = "none"
+
+[package.metadata.release]
+push = false
+pre-release-commit-message = "chore: bump version to {{version}}"
+pre-release-replacements = [
+    { file = "Makefile", search = "target/package/pam_okta_auth-[a-z0-9\\.-]+.crate", replace = "target/package/pam_okta_auth-{{version}}.crate", prerelease = true } ,
+    { file = "packaging/rpm/pam_okta_auth.spec", search = "%global rawversion [a-z0-9\\.-]+", replace = "%global rawversion {{version}}", prerelease = true } ,
+    { file = "doc/pam_okta_auth.8", search = ".Dd [-0-9]+", replace = ".Dd {{date}}", prerelease = true } ,
+    { file = "doc/pam_okta_auth.8", search = ".Os pam_okta_auth [a-z0-9\\.-]+", replace = ".Os pam_okta_auth {{version}}", prerelease = true } ,
+]
