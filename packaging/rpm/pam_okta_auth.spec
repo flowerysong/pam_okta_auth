@@ -11,6 +11,7 @@ Summary: PAM module for Okta
 License: MIT AND Apache-2.0 AND ISC AND BSD-3-Clause AND CDLA-Permissive-2.0 AND GPL-3.0
 URL: https://github.com/flowerysong/pam_okta_auth
 Source: %{name}-%{rawversion}.crate
+BuildRequires: pam-devel
 BuildRequires: rust-toolset
 
 %description
