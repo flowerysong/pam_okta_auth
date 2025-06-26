@@ -2,6 +2,8 @@
 
 Okta authentication for Unix systems.
 
+![demo](doc/pam_okta_auth.gif)
+
 pam_okta_auth is a Pluggable Authentication Modules (PAM)
 module designed to provide secondary authentication similar to
 [duo_unix](https://github.com/duosecurity/duo_unix) using Okta.
