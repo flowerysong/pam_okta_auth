@@ -1,0 +1,50 @@
+name: build
+on:
+  push:
+  pull_request:
+
+jobs:
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install rustfmt
+        run: |
+          sudo apt update
+          sudo apt install rustfmt
+
+      - name: Check code formatting
+        run: |
+          cargo fmt
+          git diff
+          git status --porcelain | grep -q '^ M' && exit 1 || exit 0
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install rustfmt
+        run: |
+          sudo apt update
+          sudo apt install rust-clippy
+
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install cargo libpam-dev
+
+      - name: Build software
+        run: cargo build
