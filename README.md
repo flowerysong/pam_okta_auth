@@ -16,7 +16,7 @@ authentication.
 
 The configuration file, normally located at
 `/etc/security/pam_okta_auth.toml`, uses the [TOML](https://toml.io/)
-format.
+format. This file contains secrets, so it must not be world readable.
 
 Supported configuration file options and PAM options are documented
 in the man page.

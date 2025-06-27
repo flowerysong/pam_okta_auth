@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - OOB polling terminates early if the server indicates that the request was
   rejected by the user.
+- Attempting to use a world-accessible config file will fail loudly.
 
 ### Fixed
 - RPM build issues on RHEL 10
