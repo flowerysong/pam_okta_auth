@@ -216,6 +216,7 @@ impl PamServiceModule for PamOkta {
         oh.log_info(&format!("Authentication attempt for {username}"));
 
         let mut conf_path = String::from("/etc/security/pam_okta_auth.toml");
+        let mut autopush = false;
         let mut password_auth = false;
         let mut try_first_pass = false;
         let mut use_first_pass = false;
@@ -229,6 +230,7 @@ impl PamServiceModule for PamOkta {
                     _ => oh.log_info(&format!("Unknown PAM argument: {arg}")),
                 },
                 None => match arg.as_str() {
+                    "autopush" => autopush = true,
                     "password_auth" => password_auth = true,
                     "try_first_pass" => try_first_pass = true,
                     "use_first_pass" => use_first_pass = true,
@@ -274,6 +276,10 @@ impl PamServiceModule for PamOkta {
 
         if let Some(res) = oh.check_bypass_groups(username) {
             return res;
+        }
+
+        if autopush {
+            return oh.factor_push(username);
         }
 
         match pamh.conv(

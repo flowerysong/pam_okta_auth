@@ -9,6 +9,7 @@
 .Sh SYNOPSIS
 .Nm pam_okta_auth.so
 .Op Cm config_file= Ns Ar FILENAME
+.Op Cm autopush
 .Op Cm password_auth
 .Op Cm try_first_pass
 .Op Cm use_first_pass
@@ -23,6 +24,9 @@ authenticates users against the Okta authentication service.
 .It config_file= Ns Ar FILENAME
 Specify a config file to load instead of
 .Pa /etc/security/pam_okta_auth.toml
+
+.It autopush
+Automatically initiate push verification instead of prompting for a passcode.
 
 .It password_auth
 Perform primary authentication against Okta before prompting for a

@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 - SELinux support
 - Additional visible indicators of authentication progress
 - HTTP proxy support
+- autopush flag
 
 ### Changed
 
