@@ -46,5 +46,66 @@ jobs:
           sudo apt update
           sudo apt install cargo libpam-dev
 
-      - name: Build software
-        run: cargo build
+      - name: Build package
+        run: cargo package
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          path: target/package/pam_okta_auth-*.crate
+          name: crate
+
+  build-el:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        el_version: [8, 9, 10]
+    runs-on: ubuntu-latest
+    container: almalinux:${{ matrix.el_version }}
+    steps:
+      - name: Install build deps
+        run: dnf install -y git gzip make pam-devel rpmdevtools rust-toolset selinux-policy-devel
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+          name: crate
+
+      - name: Build RPM
+        run: rpmbuild -ta pam_okta_auth-*.crate
+
+      - name: Upload RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: el${{ matrix.el_version }}
+          path: |
+            ~/rpmbuild/RPMS/noarch/*
+            ~/rpmbuild/RPMS/x86_64/*
+            ~/rpmbuild/SRPMS/*
+
+  build-deb:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install build deps
+        run: |
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+          sudo apt update
+          sudo apt install libpam-dev make nfpm rust-all
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+          name: crate
+
+      - name: Build .deb
+        run: |
+          tar --strip-components=1 -xvaf pam_okta_auth-*.crate
+          make deb
+
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: deb/*
