@@ -51,6 +51,11 @@ impl OktaHandle<'_> {
         let _ = self.pamh.syslog(LogLvl::INFO, msg);
     }
 
+    fn send_error(&self, msg: &str) {
+        self.log_info(msg);
+        let _ = self.pamh.conv(Some(msg), PamMsgStyle::ERROR_MSG);
+    }
+
     fn send_info(&self, msg: &str) {
         self.log_info(msg);
         let _ = self.pamh.conv(Some(msg), PamMsgStyle::TEXT_INFO);
@@ -114,7 +119,7 @@ impl OktaHandle<'_> {
                 PamError::SUCCESS
             }
             Err(e) => {
-                self.send_info("OTP authentication failed");
+                self.send_error("OTP authentication failed");
                 self.log_error(&e)
             }
         }
@@ -139,7 +144,7 @@ impl OktaHandle<'_> {
                 PamError::SUCCESS
             }
             Err(e) => {
-                self.send_info("Password authentication failed");
+                self.send_error("Password authentication failed");
                 self.log_error(&e)
             }
         }
@@ -207,7 +212,7 @@ impl OktaHandle<'_> {
             };
 
             if resp_json["error"].as_str().unwrap_or("") == "invalid_grant" {
-                self.send_info(&format!(
+                self.send_error(&format!(
                     "Push failed: {}",
                     resp_json["error_description"].as_str().unwrap_or("")
                 ));
@@ -215,7 +220,7 @@ impl OktaHandle<'_> {
             };
         }
 
-        self.send_info("Timed out waiting for acknowledgment");
+        self.send_error("Timed out waiting for acknowledgment");
         PamError::AUTHINFO_UNAVAIL
     }
 }
