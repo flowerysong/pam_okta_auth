@@ -35,6 +35,27 @@ struct OktaHandle<'a> {
 }
 
 impl OktaHandle<'_> {
+    fn log_error(&self, error: &dyn std::error::Error) -> PamError {
+        match self
+            .pamh
+            .syslog(LogLvl::NOTICE, &format!("Error: {}", error))
+        {
+            Ok(_) => {}
+            Err(e) => return e,
+        }
+
+        PamError::AUTHINFO_UNAVAIL
+    }
+
+    fn log_info(&self, msg: &str) {
+        let _ = self.pamh.syslog(LogLvl::INFO, msg);
+    }
+
+    fn send_info(&self, msg: &str) {
+        self.log_info(msg);
+        let _ = self.pamh.conv(Some(msg), PamMsgStyle::TEXT_INFO);
+    }
+
     fn check_bypass_groups(&self, username: &str) -> Option<PamError> {
         if self.conf.bypass_groups.is_empty() {
             return None;
@@ -56,27 +77,6 @@ impl OktaHandle<'_> {
             None => return Some(PamError::USER_UNKNOWN),
         }
         None
-    }
-
-    fn log_error(&self, error: &dyn std::error::Error) -> PamError {
-        match self
-            .pamh
-            .syslog(LogLvl::NOTICE, &format!("Error: {}", error))
-        {
-            Ok(_) => {}
-            Err(e) => return e,
-        }
-
-        PamError::AUTHINFO_UNAVAIL
-    }
-
-    fn log_info(&self, msg: &str) {
-        let _ = self.pamh.syslog(LogLvl::INFO, msg);
-    }
-
-    fn send_info(&self, msg: &str) {
-        self.log_info(msg);
-        let _ = self.pamh.conv(Some(msg), PamMsgStyle::TEXT_INFO);
     }
 
     fn configure_agent(&mut self) {
