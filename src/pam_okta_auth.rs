@@ -24,11 +24,14 @@ struct OktaConfig {
     client_secret: String,
     #[serde(default)]
     bypass_groups: toml::value::Array,
+    #[serde(default)]
+    http_proxy: String,
 }
 
 struct OktaHandle<'a> {
     pamh: &'a Pam,
     conf: OktaConfig,
+    agent: ureq::Agent,
 }
 
 impl OktaHandle<'_> {
@@ -76,6 +79,23 @@ impl OktaHandle<'_> {
         let _ = self.pamh.conv(Some(msg), PamMsgStyle::TEXT_INFO);
     }
 
+    fn configure_agent(&mut self) {
+        if !self.conf.http_proxy.is_empty() {
+            let proxy = ureq::Proxy::new(&self.conf.http_proxy);
+            if proxy.is_ok() {
+                self.agent = ureq::Agent::config_builder()
+                    .proxy(Some(proxy.unwrap()))
+                    .build()
+                    .into();
+            } else {
+                self.log_info(&format!(
+                    "Ignoring invalid HTTP proxy: {}",
+                    self.conf.http_proxy
+                ));
+            }
+        }
+    }
+
     fn factor_otp(&self, username: &str, otp: &str) -> PamError {
         self.log_info(&format!("Attempting OTP authentication for {username}"));
 
@@ -88,7 +108,7 @@ impl OktaHandle<'_> {
             ("login_hint", username),
             ("otp", otp),
         ];
-        match ureq::post(&url).send_form(form_data) {
+        match self.agent.post(&url).send_form(form_data) {
             Ok(_) => {
                 self.send_info("OTP authentication succeeded");
                 PamError::SUCCESS
@@ -113,7 +133,7 @@ impl OktaHandle<'_> {
             ("username", username),
             ("password", password),
         ];
-        match ureq::post(&url).send_form(form_data) {
+        match self.agent.post(&url).send_form(form_data) {
             Ok(_) => {
                 self.send_info("Password authentication succeeded");
                 PamError::SUCCESS
@@ -136,7 +156,7 @@ impl OktaHandle<'_> {
             ("login_hint", username),
         ];
 
-        let resp_json: serde_json::Value = match ureq::post(&push_url).send_form(form_data) {
+        let resp_json: serde_json::Value = match self.agent.post(&push_url).send_form(form_data) {
             Ok(mut resp) => match resp.body_mut().read_json() {
                 Ok(res) => res,
                 Err(e) => return self.log_error(&e),
@@ -162,7 +182,7 @@ impl OktaHandle<'_> {
 
         while now.elapsed().as_secs() <= timeout {
             std::thread::sleep(interval);
-            if ureq::post(&token_url).send_form(form_data).is_ok() {
+            if self.agent.post(&token_url).send_form(form_data).is_ok() {
                 self.send_info("Push acknowledged");
                 return PamError::SUCCESS;
             }
@@ -188,7 +208,9 @@ impl PamServiceModule for PamOkta {
                 client_id: String::from(""),
                 client_secret: String::from(""),
                 bypass_groups: toml::value::Array::new(),
+                http_proxy: String::from(""),
             },
+            agent: ureq::agent(),
         };
 
         oh.log_info(&format!("Authentication attempt for {username}"));
@@ -221,6 +243,7 @@ impl PamServiceModule for PamOkta {
         };
 
         oh.conf = toml::from_str(&conf_file).unwrap();
+        oh.configure_agent();
 
         if password_auth {
             if try_first_pass || use_first_pass {
