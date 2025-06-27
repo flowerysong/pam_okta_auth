@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## [0.2.0](https://github.com/flowerysong/pam_okta_auth/releases/tag/v0.2.0) - 2025-06-27
 
 ### Added
 - SELinux support
