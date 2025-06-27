@@ -26,148 +26,151 @@ struct OktaConfig {
     bypass_groups: toml::value::Array,
 }
 
-fn check_bypass_groups(pamh: &Pam, conf: &OktaConfig, username: &str) -> Option<PamError> {
-    if conf.bypass_groups.is_empty() {
-        return None;
-    }
+struct OktaHandle<'a> {
+    pamh: &'a Pam,
+    conf: OktaConfig,
+}
 
-    match uzers::get_user_by_name(username) {
-        Some(user) => {
-            for group1 in user.groups().unwrap() {
-                let g1 = group1.name().to_str().unwrap_or("");
-                for group2 in &conf.bypass_groups {
-                    let g2 = group2.as_str().unwrap_or("");
-                    if g1 == g2 {
-                        log_info(pamh, &format!("User is in bypass group {g2}"));
-                        return Some(PamError::SUCCESS);
+impl OktaHandle<'_> {
+    fn check_bypass_groups(&self, username: &str) -> Option<PamError> {
+        if self.conf.bypass_groups.is_empty() {
+            return None;
+        }
+
+        match uzers::get_user_by_name(username) {
+            Some(user) => {
+                for group1 in user.groups().unwrap() {
+                    let g1 = group1.name().to_str().unwrap_or("");
+                    for group2 in &self.conf.bypass_groups {
+                        let g2 = group2.as_str().unwrap_or("");
+                        if g1 == g2 {
+                            self.log_info(&format!("User is in bypass group {g2}"));
+                            return Some(PamError::SUCCESS);
+                        }
                     }
                 }
             }
+            None => return Some(PamError::USER_UNKNOWN),
         }
-        None => return Some(PamError::USER_UNKNOWN),
-    }
-    None
-}
-
-fn log_error(pamh: &Pam, error: &dyn std::error::Error) -> PamError {
-    match pamh.syslog(LogLvl::NOTICE, &format!("Error: {}", error)) {
-        Ok(_) => {}
-        Err(e) => return e,
+        None
     }
 
-    PamError::AUTHINFO_UNAVAIL
-}
-
-fn log_info(pamh: &Pam, msg: &str) {
-    let _ = pamh.syslog(LogLvl::INFO, msg);
-}
-
-fn send_info(pamh: &Pam, msg: &str) {
-    log_info(pamh, msg);
-    let _ = pamh.conv(Some(msg), PamMsgStyle::TEXT_INFO);
-}
-
-fn factor_otp(pamh: &Pam, conf: &OktaConfig, username: &str, otp: &str) -> PamError {
-    log_info(
-        pamh,
-        &format!("Attempting OTP authentication for {username}"),
-    );
-
-    let url = format!("https://{}/oauth2/v1/token", conf.host);
-    let form_data = [
-        ("client_id", conf.client_id.as_str()),
-        ("client_secret", conf.client_secret.as_str()),
-        ("grant_type", "urn:okta:params:oauth:grant-type:otp"),
-        ("scope", "openid"),
-        ("login_hint", username),
-        ("otp", otp),
-    ];
-    match ureq::post(&url).send_form(form_data) {
-        Ok(_) => {
-            send_info(pamh, "OTP authentication succeeded");
-            PamError::SUCCESS
+    fn log_error(&self, error: &dyn std::error::Error) -> PamError {
+        match self
+            .pamh
+            .syslog(LogLvl::NOTICE, &format!("Error: {}", error))
+        {
+            Ok(_) => {}
+            Err(e) => return e,
         }
-        Err(e) => {
-            send_info(pamh, "OTP authentication failed");
-            log_error(pamh, &e)
-        }
+
+        PamError::AUTHINFO_UNAVAIL
     }
-}
 
-fn factor_password(pamh: &Pam, conf: &OktaConfig, username: &str, password: &str) -> PamError {
-    log_info(
-        pamh,
-        &format!("Attempting password authentication for {username}"),
-    );
-    let url = format!("https://{}/oauth2/v1/token", conf.host);
-    let form_data = [
-        ("client_id", conf.client_id.as_str()),
-        ("client_secret", conf.client_secret.as_str()),
-        ("grant_type", "password"),
-        ("scope", "openid"),
-        ("username", username),
-        ("password", password),
-    ];
-    match ureq::post(&url).send_form(form_data) {
-        Ok(_) => {
-            send_info(pamh, "Password authentication succeeded");
-            PamError::SUCCESS
-        }
-        Err(e) => {
-            send_info(pamh, "Password authentication failed");
-            log_error(pamh, &e)
-        }
+    fn log_info(&self, msg: &str) {
+        let _ = self.pamh.syslog(LogLvl::INFO, msg);
     }
-}
 
-fn factor_push(pamh: &Pam, conf: &OktaConfig, username: &str) -> PamError {
-    log_info(
-        pamh,
-        &format!("Attempting push authentication for {username}"),
-    );
+    fn send_info(&self, msg: &str) {
+        self.log_info(msg);
+        let _ = self.pamh.conv(Some(msg), PamMsgStyle::TEXT_INFO);
+    }
 
-    let push_url = format!("https://{}/oauth2/v1/oob-authenticate", conf.host);
-    let form_data = [
-        ("client_id", conf.client_id.as_str()),
-        ("client_secret", conf.client_secret.as_str()),
-        ("channel_hint", "push"),
-        ("login_hint", username),
-    ];
+    fn factor_otp(&self, username: &str, otp: &str) -> PamError {
+        self.log_info(&format!("Attempting OTP authentication for {username}"));
 
-    let resp_json: serde_json::Value = match ureq::post(&push_url).send_form(form_data) {
-        Ok(mut resp) => match resp.body_mut().read_json() {
-            Ok(res) => res,
-            Err(e) => return log_error(pamh, &e),
-        },
-        Err(e) => return log_error(pamh, &e),
-    };
-
-    send_info(pamh, "Successfully initiated Okta push");
-
-    let now = std::time::Instant::now();
-    let token_url = format!("https://{}/oauth2/v1/token", conf.host);
-
-    let form_data = [
-        ("client_id", conf.client_id.as_str()),
-        ("client_secret", conf.client_secret.as_str()),
-        ("grant_type", "urn:okta:params:oauth:grant-type:oob"),
-        ("scope", "openid"),
-        ("oob_code", resp_json["oob_code"].as_str().unwrap_or("")),
-    ];
-
-    let timeout = resp_json["expires_in"].as_u64().unwrap_or(0);
-    let interval = std::time::Duration::from_secs(resp_json["interval"].as_u64().unwrap_or(10));
-
-    while now.elapsed().as_secs() <= timeout {
-        std::thread::sleep(interval);
-        if ureq::post(&token_url).send_form(form_data).is_ok() {
-            send_info(pamh, "Push acknowledged");
-            return PamError::SUCCESS;
+        let url = format!("https://{}/oauth2/v1/token", self.conf.host);
+        let form_data = [
+            ("client_id", self.conf.client_id.as_str()),
+            ("client_secret", self.conf.client_secret.as_str()),
+            ("grant_type", "urn:okta:params:oauth:grant-type:otp"),
+            ("scope", "openid"),
+            ("login_hint", username),
+            ("otp", otp),
+        ];
+        match ureq::post(&url).send_form(form_data) {
+            Ok(_) => {
+                self.send_info("OTP authentication succeeded");
+                PamError::SUCCESS
+            }
+            Err(e) => {
+                self.send_info("OTP authentication failed");
+                self.log_error(&e)
+            }
         }
     }
 
-    send_info(pamh, "Timed out waiting for acknowledgment");
-    PamError::AUTHINFO_UNAVAIL
+    fn factor_password(&self, username: &str, password: &str) -> PamError {
+        self.log_info(&format!(
+            "Attempting password authentication for {username}"
+        ));
+        let url = format!("https://{}/oauth2/v1/token", self.conf.host);
+        let form_data = [
+            ("client_id", self.conf.client_id.as_str()),
+            ("client_secret", self.conf.client_secret.as_str()),
+            ("grant_type", "password"),
+            ("scope", "openid"),
+            ("username", username),
+            ("password", password),
+        ];
+        match ureq::post(&url).send_form(form_data) {
+            Ok(_) => {
+                self.send_info("Password authentication succeeded");
+                PamError::SUCCESS
+            }
+            Err(e) => {
+                self.send_info("Password authentication failed");
+                self.log_error(&e)
+            }
+        }
+    }
+
+    fn factor_push(&self, username: &str) -> PamError {
+        self.log_info(&format!("Attempting push authentication for {username}"));
+
+        let push_url = format!("https://{}/oauth2/v1/oob-authenticate", self.conf.host);
+        let form_data = [
+            ("client_id", self.conf.client_id.as_str()),
+            ("client_secret", self.conf.client_secret.as_str()),
+            ("channel_hint", "push"),
+            ("login_hint", username),
+        ];
+
+        let resp_json: serde_json::Value = match ureq::post(&push_url).send_form(form_data) {
+            Ok(mut resp) => match resp.body_mut().read_json() {
+                Ok(res) => res,
+                Err(e) => return self.log_error(&e),
+            },
+            Err(e) => return self.log_error(&e),
+        };
+
+        self.send_info("Successfully initiated Okta push");
+
+        let now = std::time::Instant::now();
+        let token_url = format!("https://{}/oauth2/v1/token", self.conf.host);
+
+        let form_data = [
+            ("client_id", self.conf.client_id.as_str()),
+            ("client_secret", self.conf.client_secret.as_str()),
+            ("grant_type", "urn:okta:params:oauth:grant-type:oob"),
+            ("scope", "openid"),
+            ("oob_code", resp_json["oob_code"].as_str().unwrap_or("")),
+        ];
+
+        let timeout = resp_json["expires_in"].as_u64().unwrap_or(0);
+        let interval = std::time::Duration::from_secs(resp_json["interval"].as_u64().unwrap_or(10));
+
+        while now.elapsed().as_secs() <= timeout {
+            std::thread::sleep(interval);
+            if ureq::post(&token_url).send_form(form_data).is_ok() {
+                self.send_info("Push acknowledged");
+                return PamError::SUCCESS;
+            }
+        }
+
+        self.send_info("Timed out waiting for acknowledgment");
+        PamError::AUTHINFO_UNAVAIL
+    }
 }
 
 impl PamServiceModule for PamOkta {
@@ -178,7 +181,17 @@ impl PamServiceModule for PamOkta {
             Err(e) => return e,
         };
 
-        log_info(&pamh, &format!("Authentication attempt for {username}"));
+        let mut oh = OktaHandle {
+            pamh: &pamh,
+            conf: OktaConfig {
+                host: String::from(""),
+                client_id: String::from(""),
+                client_secret: String::from(""),
+                bypass_groups: toml::value::Array::new(),
+            },
+        };
+
+        oh.log_info(&format!("Authentication attempt for {username}"));
 
         let mut conf_path = String::from("/etc/security/pam_okta_auth.toml");
         let mut password_auth = false;
@@ -191,23 +204,23 @@ impl PamServiceModule for PamOkta {
                     "config_file" => {
                         conf_path = String::from(v);
                     }
-                    _ => log_info(&pamh, &format!("Unknown PAM argument: {arg}")),
+                    _ => oh.log_info(&format!("Unknown PAM argument: {arg}")),
                 },
                 None => match arg.as_str() {
                     "password_auth" => password_auth = true,
                     "try_first_pass" => try_first_pass = true,
                     "use_first_pass" => use_first_pass = true,
-                    _ => log_info(&pamh, &format!("Unknown PAM argument: {arg}")),
+                    _ => oh.log_info(&format!("Unknown PAM argument: {arg}")),
                 },
             }
         }
 
         let conf_file = match std::fs::read_to_string(std::path::Path::new(&conf_path)) {
             Ok(f) => f,
-            Err(e) => return log_error(&pamh, &e),
+            Err(e) => return oh.log_error(&e),
         };
 
-        let conf: OktaConfig = toml::from_str(&conf_file).unwrap();
+        oh.conf = toml::from_str(&conf_file).unwrap();
 
         if password_auth {
             if try_first_pass || use_first_pass {
@@ -216,7 +229,7 @@ impl PamServiceModule for PamOkta {
                     Ok(_) => "",
                     Err(e) => return e,
                 };
-                if factor_password(&pamh, &conf, username, password) == PamError::SUCCESS {
+                if oh.factor_password(username, password) == PamError::SUCCESS {
                     password_auth = false;
                 } else if use_first_pass {
                     return PamError::AUTH_ERR;
@@ -229,21 +242,25 @@ impl PamServiceModule for PamOkta {
                         Ok(_) => "",
                         Err(e) => return e,
                     };
-                let res = factor_password(&pamh, &conf, username, password);
+                let res = oh.factor_password(username, password);
                 if res != PamError::SUCCESS {
                     return res;
                 }
             }
         }
 
-        if let Some(res) = check_bypass_groups(&pamh, &conf, username) {
+        if let Some(res) = oh.check_bypass_groups(username) {
             return res;
         }
 
-        match pamh.conv(Some(&format!("\nOkta authentication for {username}\n\nPasscode (leave blank to initiate a push): ")), PamMsgStyle::PROMPT_ECHO_ON) {
-            Ok(Some(otp)) if !otp.to_str().unwrap_or("").is_empty() =>
-                factor_otp(&pamh, &conf, username, otp.to_str().unwrap_or("")),
-            Ok(_) => factor_push(&pamh, &conf, username),
+        match pamh.conv(
+            Some("Okta passcode (leave blank to initiate a push): "),
+            PamMsgStyle::PROMPT_ECHO_ON,
+        ) {
+            Ok(Some(otp)) if !otp.to_str().unwrap_or("").is_empty() => {
+                oh.factor_otp(username, otp.to_str().unwrap_or(""))
+            }
+            Ok(_) => oh.factor_push(username),
             Err(e) => e,
         }
     }
