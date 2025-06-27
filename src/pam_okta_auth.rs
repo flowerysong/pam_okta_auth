@@ -182,10 +182,37 @@ impl OktaHandle<'_> {
 
         while now.elapsed().as_secs() <= timeout {
             std::thread::sleep(interval);
-            if self.agent.post(&token_url).send_form(form_data).is_ok() {
-                self.send_info("Push acknowledged");
-                return PamError::SUCCESS;
-            }
+
+            let resp_json: serde_json::Value = match self
+                .agent
+                .post(&token_url)
+                .config()
+                .http_status_as_error(false)
+                .build()
+                .send_form(form_data)
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    self.send_info("Push acknowledged");
+                    return PamError::SUCCESS;
+                }
+                Ok(mut resp) => match resp.body_mut().read_json() {
+                    Ok(res) => res,
+                    Err(_) => {
+                        continue;
+                    }
+                },
+                Err(_) => {
+                    continue;
+                }
+            };
+
+            if resp_json["error"].as_str().unwrap_or("") == "invalid_grant" {
+                self.send_info(&format!(
+                    "Push failed: {}",
+                    resp_json["error_description"].as_str().unwrap_or("")
+                ));
+                return PamError::AUTH_ERR;
+            };
         }
 
         self.send_info("Timed out waiting for acknowledgment");

@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 - autopush flag
 
 ### Changed
+- OOB polling terminates early if the server indicates that the request was
+  rejected by the user.
 
 ### Fixed
 - RPM build issues on RHEL 10
