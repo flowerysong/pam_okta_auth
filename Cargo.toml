@@ -34,3 +34,4 @@ pre-release-replacements = [
     { file = "doc/pam_okta_auth.8", search = ".Dd [-0-9]+", replace = ".Dd {{date}}", prerelease = true } ,
     { file = "doc/pam_okta_auth.8", search = ".Os pam_okta_auth [a-z0-9\\.-]+", replace = ".Os pam_okta_auth {{version}}", prerelease = true } ,
 ]
+pre-release-hook = ["make", "doc"]

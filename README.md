@@ -19,7 +19,7 @@ The configuration file, normally located at
 format. This file contains secrets, so it must not be world readable.
 
 Supported configuration file options and PAM options are documented
-in the man page.
+in the [man page](doc/pam_okta_auth.8.md).
 
 Okta client credentials are required; these should be for a native
 application with at least the `OTP` and `OOB` direct auth grants.
