@@ -20,50 +20,50 @@ authenticates users against the Okta authentication service.
 
 # OPTIONS
 
-config\_file=*FILENAME*
+*config\_file=*&zwnj;*FILENAME*
 
 > Specify a config file to load instead of
 > */etc/security/pam\_okta\_auth.toml*
 
-autopush
+*autopush*
 
 > Automatically initiate push verification instead of prompting for a passcode.
 
-password\_auth
+*password\_auth*
 
 > Perform primary authentication against Okta before prompting for a
 > secondary factor.
 
-try\_first\_pass
+*try\_first\_pass*
 
 > Before prompting the user for a password, attempt authentication using one
 > supplied to a prior module in the stack if possible.
 
-use\_first\_pass
+*use\_first\_pass*
 
 > Use the password supplied to a prior module instead of prompting.
 > If none is available, authentication will fail.
 
 # CONFIGURATION OPTIONS
 
-host
+*host*
 
 > Okta tenant hostname (required)
 
-client\_id
+*client\_id*
 
 > OAuth2 client ID (required)
 
-client\_secret
+*client\_secret*
 
 > OAuth2 client secret (required)
 
-bypass\_groups
+*bypass\_groups*
 
 > List of groups whose members are not required to provide a secondary factor.
 > This setting does not affect primary authentication if that is enabled.
 
-http\_proxy
+*http\_proxy*
 
 > URI of the proxy to use for requests.
 
