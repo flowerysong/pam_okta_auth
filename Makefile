@@ -9,12 +9,17 @@ prefix = /usr/local
 
 .MAKE: all
 
-.PHONY: build deb install package rpm selinux
+.PHONY: build deb doc install package rpm selinux
 
 all: build selinux COPYING.dependencies
 
 COPYING.dependencies: Cargo.lock
 	env RUSTC_BOOTSTRAP=1 cargo tree -Z avoid-dev-deps --edges no-build,no-dev,no-proc-macro --no-dedupe --prefix none --format "{l}: {p}" | sed -e "s: ($(pwd)[^)]*)::g" -e "s: / :/:g" -e "s:/: OR :g" | sort -u > COPYING.dependencies
+
+doc/pam_okta_auth.8.md: doc/pam_okta_auth.8
+	mandoc doc/pam_okta_auth.8 -T markdown > doc/pam_okta_auth.8.md
+
+doc: doc/pam_okta_auth.8.md
 
 build:
 	cargo build --locked --profile $(TARGET_PROFILE)
