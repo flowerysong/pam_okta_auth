@@ -63,6 +63,10 @@ authenticates users against the Okta authentication service.
 > List of groups whose members are not required to provide a secondary factor.
 > This setting does not affect primary authentication if that is enabled.
 
+**debug**
+
+> Boolean flag to enable increased log verbosity.
+
 **http\_proxy**
 
 > URI of the proxy to use for requests.
