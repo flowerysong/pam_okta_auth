@@ -28,33 +28,38 @@ struct OktaConfig {
     bypass_groups: toml::value::Array,
     #[serde(default)]
     http_proxy: String,
+    #[serde(default)]
+    debug: bool,
 }
 
 struct OktaHandle<'a> {
     pamh: &'a Pam,
     conf: OktaConfig,
     agent: ureq::Agent,
+    mfa_token: Option<String>,
+}
+
+fn ureq_config_base() -> ureq::config::ConfigBuilder<ureq::typestate::AgentScope> {
+    ureq::Agent::config_builder().http_status_as_error(false)
 }
 
 impl OktaHandle<'_> {
-    fn log_error(&self, error: &dyn std::error::Error) -> PamError {
-        match self
-            .pamh
-            .syslog(LogLvl::NOTICE, &format!("Error: {}", error))
-        {
-            Ok(_) => {}
-            Err(e) => return e,
-        }
-
-        PamError::AUTHINFO_UNAVAIL
+    fn log_error(&self, msg: &str) {
+        let _ = self.pamh.syslog(LogLvl::NOTICE, msg);
     }
 
     fn log_info(&self, msg: &str) {
         let _ = self.pamh.syslog(LogLvl::INFO, msg);
     }
 
+    fn log_debug(&self, msg: &str) {
+        if self.conf.debug {
+            self.log_info(msg);
+        }
+    }
+
     fn send_error(&self, msg: &str) {
-        self.log_info(msg);
+        self.log_error(msg);
         let _ = self.pamh.conv(Some(msg), PamMsgStyle::ERROR_MSG);
     }
 
@@ -90,7 +95,7 @@ impl OktaHandle<'_> {
         if !self.conf.http_proxy.is_empty() {
             let proxy = ureq::Proxy::new(&self.conf.http_proxy);
             if proxy.is_ok() {
-                self.agent = ureq::Agent::config_builder()
+                self.agent = ureq_config_base()
                     .proxy(Some(proxy.unwrap()))
                     .build()
                     .into();
@@ -107,27 +112,43 @@ impl OktaHandle<'_> {
         self.log_info(&format!("Attempting OTP authentication for {username}"));
 
         let url = format!("https://{}/oauth2/v1/token", self.conf.host);
-        let form_data = [
+        let mut form_data = vec![
             ("client_id", self.conf.client_id.as_str()),
             ("client_secret", self.conf.client_secret.as_str()),
-            ("grant_type", "urn:okta:params:oauth:grant-type:otp"),
             ("scope", "openid"),
-            ("login_hint", username),
             ("otp", otp),
         ];
+
+        match &self.mfa_token {
+            Some(tok) => {
+                form_data.push(("grant_type", "http://auth0.com/oauth/grant-type/mfa-otp"));
+                form_data.push(("mfa_token", tok.as_str()));
+            }
+            None => {
+                form_data.push(("grant_type", "urn:okta:params:oauth:grant-type:otp"));
+                form_data.push(("login_hint", username));
+            }
+        }
+
         match self.agent.post(&url).send_form(form_data) {
-            Ok(_) => {
+            Ok(resp) if resp.status().is_success() => {
                 self.send_info("OTP authentication succeeded");
                 PamError::SUCCESS
             }
+            Ok(mut resp) => {
+                self.log_error(&format!("HTTP {}", resp.status()));
+                self.log_debug(&resp.body_mut().read_to_string().unwrap_or_default());
+                PamError::AUTH_ERR
+            }
             Err(e) => {
+                self.log_error(&e.to_string());
                 self.send_error("OTP authentication failed");
-                self.log_error(&e)
+                PamError::AUTH_ERR
             }
         }
     }
 
-    fn factor_password(&self, username: &str, password: &str) -> PamError {
+    fn factor_password(&mut self, username: &str, password: &str) -> Option<PamError> {
         self.log_info(&format!(
             "Attempting password authentication for {username}"
         ));
@@ -140,35 +161,83 @@ impl OktaHandle<'_> {
             ("username", username),
             ("password", password),
         ];
-        match self.agent.post(&url).send_form(form_data) {
-            Ok(_) => {
+
+        let resp_json: serde_json::Value = match self.agent.post(&url).send_form(form_data) {
+            Ok(resp) if resp.status().is_success() => {
                 self.send_info("Password authentication succeeded");
-                PamError::SUCCESS
+                return Some(PamError::SUCCESS);
+            }
+            Ok(mut resp) => {
+                self.log_error(&format!("HTTP {}", resp.status()));
+                self.log_debug(&resp.body_mut().read_to_string().unwrap_or_default());
+                match resp.body_mut().read_json() {
+                    Ok(res) => res,
+                    Err(_) => {
+                        self.send_error("Password authentication failed");
+                        return Some(PamError::AUTHINFO_UNAVAIL);
+                    }
+                }
             }
             Err(e) => {
+                self.log_error(&e.to_string());
                 self.send_error("Password authentication failed");
-                self.log_error(&e)
+                return Some(PamError::AUTH_ERR);
             }
+        };
+
+        let err = resp_json["error"].as_str().unwrap_or("");
+        if err == "mfa_required" {
+            self.mfa_token = Some(String::from(resp_json["mfa_token"].as_str().unwrap_or("")));
+            self.send_info(resp_json["error_description"].as_str().unwrap_or(""));
+            return None;
         }
+        self.log_info(&format!("Password authentication failed: {err}"));
+
+        Some(PamError::AUTH_ERR)
     }
 
     fn factor_push(&self, username: &str) -> PamError {
         self.log_info(&format!("Attempting push authentication for {username}"));
 
-        let push_url = format!("https://{}/oauth2/v1/oob-authenticate", self.conf.host);
-        let form_data = [
+        let mut push_url = format!("https://{}/oauth2/v1/", self.conf.host);
+        let mut form_data = vec![
             ("client_id", self.conf.client_id.as_str()),
             ("client_secret", self.conf.client_secret.as_str()),
             ("channel_hint", "push"),
-            ("login_hint", username),
         ];
 
+        match &self.mfa_token {
+            Some(tok) => {
+                push_url.push_str("challenge");
+                form_data.push((
+                    "challenge_types_supported",
+                    "http://auth0.com/oauth/grant-type/mfa-oob",
+                ));
+                form_data.push(("mfa_token", tok.as_str()));
+            }
+            None => {
+                push_url.push_str("oob-authenticate");
+                form_data.push(("login_hint", username));
+            }
+        }
+
         let resp_json: serde_json::Value = match self.agent.post(&push_url).send_form(form_data) {
-            Ok(mut resp) => match resp.body_mut().read_json() {
+            Ok(mut resp) if resp.status().is_success() => match resp.body_mut().read_json() {
                 Ok(res) => res,
-                Err(e) => return self.log_error(&e),
+                Err(e) => {
+                    self.log_error(&e.to_string());
+                    return PamError::AUTHINFO_UNAVAIL;
+                }
             },
-            Err(e) => return self.log_error(&e),
+            Ok(mut resp) => {
+                self.log_error(&format!("HTTP {}", resp.status()));
+                self.log_debug(&resp.body_mut().read_to_string().unwrap_or_default());
+                return PamError::AUTH_ERR;
+            }
+            Err(e) => {
+                self.log_error(&e.to_string());
+                return PamError::AUTH_ERR;
+            }
         };
 
         self.send_info("Successfully initiated Okta push");
@@ -176,13 +245,22 @@ impl OktaHandle<'_> {
         let now = std::time::Instant::now();
         let token_url = format!("https://{}/oauth2/v1/token", self.conf.host);
 
-        let form_data = [
+        let mut form_data = vec![
             ("client_id", self.conf.client_id.as_str()),
             ("client_secret", self.conf.client_secret.as_str()),
-            ("grant_type", "urn:okta:params:oauth:grant-type:oob"),
             ("scope", "openid"),
             ("oob_code", resp_json["oob_code"].as_str().unwrap_or("")),
         ];
+
+        match &self.mfa_token {
+            Some(tok) => {
+                form_data.push(("grant_type", "http://auth0.com/oauth/grant-type/mfa-oob"));
+                form_data.push(("mfa_token", tok.as_str()));
+            }
+            None => {
+                form_data.push(("grant_type", "urn:okta:params:oauth:grant-type:oob"));
+            }
+        }
 
         let timeout = resp_json["expires_in"].as_u64().unwrap_or(0);
         let interval = std::time::Duration::from_secs(resp_json["interval"].as_u64().unwrap_or(10));
@@ -190,28 +268,26 @@ impl OktaHandle<'_> {
         while now.elapsed().as_secs() <= timeout {
             std::thread::sleep(interval);
 
-            let resp_json: serde_json::Value = match self
-                .agent
-                .post(&token_url)
-                .config()
-                .http_status_as_error(false)
-                .build()
-                .send_form(form_data)
-            {
-                Ok(resp) if resp.status().is_success() => {
-                    self.send_info("Push acknowledged");
-                    return PamError::SUCCESS;
-                }
-                Ok(mut resp) => match resp.body_mut().read_json() {
-                    Ok(res) => res,
+            let resp_json: serde_json::Value =
+                match self.agent.post(&token_url).send_form(form_data.clone()) {
+                    Ok(resp) if resp.status().is_success() => {
+                        self.send_info("Push acknowledged");
+                        return PamError::SUCCESS;
+                    }
+                    Ok(mut resp) => {
+                        self.log_debug(&format!("HTTP {}", resp.status()));
+                        self.log_debug(&resp.body_mut().read_to_string().unwrap_or_default());
+                        match resp.body_mut().read_json() {
+                            Ok(res) => res,
+                            Err(_) => {
+                                continue;
+                            }
+                        }
+                    }
                     Err(_) => {
                         continue;
                     }
-                },
-                Err(_) => {
-                    continue;
-                }
-            };
+                };
 
             if resp_json["error"].as_str().unwrap_or("") == "invalid_grant" {
                 self.send_error(&format!(
@@ -243,8 +319,10 @@ impl PamServiceModule for PamOkta {
                 client_secret: String::from(""),
                 bypass_groups: toml::value::Array::new(),
                 http_proxy: String::from(""),
+                debug: false,
             },
-            agent: ureq::agent(),
+            agent: ureq_config_base().build().into(),
+            mfa_token: None,
         };
 
         oh.log_info(&format!("Authentication attempt for {username}"));
@@ -304,10 +382,12 @@ impl PamServiceModule for PamOkta {
                     Ok(_) => "",
                     Err(e) => return e,
                 };
-                if oh.factor_password(username, password) == PamError::SUCCESS {
+                if let Some(res) = oh.factor_password(username, password) {
+                    if use_first_pass || res == PamError::SUCCESS {
+                        return res;
+                    }
+                } else {
                     password_auth = false;
-                } else if use_first_pass {
-                    return PamError::AUTH_ERR;
                 }
             }
             if password_auth {
@@ -317,15 +397,16 @@ impl PamServiceModule for PamOkta {
                         Ok(_) => "",
                         Err(e) => return e,
                     };
-                let res = oh.factor_password(username, password);
-                if res != PamError::SUCCESS {
+                if let Some(res) = oh.factor_password(username, password) {
                     return res;
                 }
             }
         }
 
-        if let Some(res) = oh.check_bypass_groups(username) {
-            return res;
+        if oh.mfa_token.is_none() {
+            if let Some(res) = oh.check_bypass_groups(username) {
+                return res;
+            }
         }
 
         if autopush {
