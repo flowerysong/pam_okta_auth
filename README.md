@@ -1,4 +1,4 @@
-# pam_okta_auth
+# pam\_okta\_auth
 
 [![build status](https://github.com/flowerysong/pam_okta_auth/actions/workflows/build.yml/badge.svg)](https://github.com/flowerysong/pam_okta_auth/actions/workflows/build.yml)
 
@@ -6,9 +6,9 @@ Okta authentication for Unix systems.
 
 ![animated demo](doc/pam_okta_auth.gif)
 
-pam_okta_auth is a Pluggable Authentication Modules (PAM)
+pam\_okta\_auth is a Pluggable Authentication Modules (PAM)
 module designed to provide secondary authentication similar to
-[duo_unix](https://github.com/duosecurity/duo_unix) using Okta.
+[duo\_unix](https://github.com/duosecurity/duo_unix) using Okta.
 It also has experimental support for password-based primary
 authentication.
 
@@ -26,8 +26,8 @@ application with at least the `OTP` and `OOB` direct auth grants.
 
 ![Okta application settings](doc/okta_app_grants.png)
 
-The application must also be assigned an authentication policy that permits
-authentication with a single factor.
+The application must also be assigned an authentication policy that
+permits authentication with a single factor.
 
 ![Okta authentication policy](doc/okta_policy.png)
 
@@ -42,5 +42,17 @@ client_secret = "6zFfFfffzfZFz6zFZFzzFZFZFfZf6Fz6F6ZfZ6f-FFFzZZ6FZ_zZFzFZ6fFzfFF
 ### Example PAM config
 
 ```
-auth       required     pam_okta_auth.so
+auth        required        pam_okta_auth.so
 ```
+
+## Deployment As Primary Authentication
+
+The password authentication flow requires client credentials for an
+app with at least the `Resource Owner Password` grant; depending on
+the authentication policy assigned to the app it may also need the
+`MFA OTP` and `MFA OOB` grants.
+
+This flow currently assumes that OTP (passcode) and push
+authentication are always acceptable second factors when MFA is
+required. It's still possible to apply a policy where only one of them
+is allowed, but the end user experience is not ideal.

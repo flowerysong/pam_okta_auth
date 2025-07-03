@@ -31,18 +31,20 @@ authenticates users against the Okta authentication service.
 
 **password\_auth**
 
-> Perform primary authentication against Okta before prompting for a
-> secondary factor.
+> Perform primary authentication against Okta using a password.
+> The user may still be prompted to use an additional factor if the Okta
+> authentication policy requires one.
 
 **try\_first\_pass**
 
-> Before prompting the user for a password, attempt authentication using one
-> supplied to a prior module in the stack if possible.
+> Try the password (if any) supplied to a prior module in the stack before
+> prompting for one.
 
 **use\_first\_pass**
 
-> Use the password supplied to a prior module instead of prompting.
-> If none is available, authentication will fail.
+> Use the password supplied to a prior module in the stack instead of prompting
+> for one.
+> Primary authentication will fail if none is available.
 
 # CONFIGURATION OPTIONS
 
@@ -61,7 +63,7 @@ authenticates users against the Okta authentication service.
 **bypass\_groups**
 
 > List of groups whose members are not required to provide a secondary factor.
-> This setting does not affect primary authentication if that is enabled.
+> This setting does not have an effect if primary authentication is enabled.
 
 **debug**
 
