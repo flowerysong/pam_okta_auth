@@ -1,0 +1,23 @@
+name: dependencies
+on:
+  push:
+  pull_request:
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install cargo libpam-dev
+
+      - name: Check for dependency updates
+        run: |
+          cargo update
+          git status --porcelain | grep -q '^ M' && cargo build
+          git diff
+          git status --porcelain | grep -q '^ M' && exit 1 || exit 0
