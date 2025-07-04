@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Primary authentication is less hacky.
+- HTTP requests send a custom User-Agent header instead of the library's.
 
 ### Fixed
 

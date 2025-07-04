@@ -40,7 +40,9 @@ struct OktaHandle<'a> {
 }
 
 fn ureq_config_base() -> ureq::config::ConfigBuilder<ureq::typestate::AgentScope> {
-    ureq::Agent::config_builder().http_status_as_error(false)
+    ureq::Agent::config_builder()
+        .user_agent(format!("ureq/{}", env!("CARGO_PKG_VERSION")))
+        .http_status_as_error(false)
 }
 
 impl OktaHandle<'_> {
