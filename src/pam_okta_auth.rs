@@ -76,9 +76,9 @@ impl OktaHandle<'_> {
         match uzers::get_user_by_name(username) {
             Some(user) => {
                 for group1 in user.groups().unwrap() {
-                    let g1 = group1.name().to_str().unwrap_or("");
+                    let g1 = group1.name().to_str().unwrap_or_default();
                     for group2 in &self.conf.bypass_groups {
-                        let g2 = group2.as_str().unwrap_or("");
+                        let g2 = group2.as_str().unwrap_or_default();
                         if g1 == g2 {
                             self.log_info(&format!("User is in bypass group {g2}"));
                             return Some(PamError::SUCCESS);
@@ -184,10 +184,12 @@ impl OktaHandle<'_> {
             }
         };
 
-        let err = resp_json["error"].as_str().unwrap_or("");
+        let err = resp_json["error"].as_str().unwrap_or_default();
         if err == "mfa_required" {
-            self.mfa_token = Some(String::from(resp_json["mfa_token"].as_str().unwrap_or("")));
-            self.send_info(resp_json["error_description"].as_str().unwrap_or(""));
+            self.mfa_token = Some(String::from(
+                resp_json["mfa_token"].as_str().unwrap_or_default(),
+            ));
+            self.send_info(resp_json["error_description"].as_str().unwrap_or_default());
             return None;
         }
         self.log_info(&format!("Password authentication failed: {err}"));
@@ -248,7 +250,10 @@ impl OktaHandle<'_> {
             ("client_id", self.conf.client_id.as_str()),
             ("client_secret", self.conf.client_secret.as_str()),
             ("scope", "openid"),
-            ("oob_code", resp_json["oob_code"].as_str().unwrap_or("")),
+            (
+                "oob_code",
+                resp_json["oob_code"].as_str().unwrap_or_default(),
+            ),
         ];
 
         match &self.mfa_token {
@@ -318,10 +323,10 @@ impl OktaHandle<'_> {
                     }
                 };
 
-            if resp_json["error"].as_str().unwrap_or("") == "invalid_grant" {
+            if resp_json["error"].as_str().unwrap_or_default() == "invalid_grant" {
                 self.send_error(&format!(
                     "Push failed: {}",
-                    resp_json["error_description"].as_str().unwrap_or("")
+                    resp_json["error_description"].as_str().unwrap_or_default()
                 ));
                 return PamError::AUTH_ERR;
             };
@@ -335,7 +340,7 @@ impl OktaHandle<'_> {
 impl PamServiceModule for PamOkta {
     fn authenticate(pamh: Pam, _: PamFlags, args: Vec<String>) -> PamError {
         let username = match pamh.get_user(None) {
-            Ok(Some(user)) => user.to_str().unwrap_or(""),
+            Ok(Some(user)) => user.to_str().unwrap_or_default(),
             Ok(None) => return PamError::USER_UNKNOWN,
             Err(e) => return e,
         };
@@ -407,7 +412,7 @@ impl PamServiceModule for PamOkta {
         if password_auth {
             if try_first_pass || use_first_pass {
                 let password = match pamh.get_cached_authtok() {
-                    Ok(Some(pass)) => pass.to_str().unwrap_or(""),
+                    Ok(Some(pass)) => pass.to_str().unwrap_or_default(),
                     Ok(_) => "",
                     Err(e) => return e,
                 };
@@ -422,7 +427,7 @@ impl PamServiceModule for PamOkta {
             if password_auth {
                 let password =
                     match pamh.conv(Some("Okta password: "), PamMsgStyle::PROMPT_ECHO_OFF) {
-                        Ok(Some(pass)) => pass.to_str().unwrap_or(""),
+                        Ok(Some(pass)) => pass.to_str().unwrap_or_default(),
                         Ok(_) => "",
                         Err(e) => return e,
                     };
@@ -446,8 +451,8 @@ impl PamServiceModule for PamOkta {
             Some("Okta passcode (leave blank to initiate a push): "),
             PamMsgStyle::PROMPT_ECHO_ON,
         ) {
-            Ok(Some(otp)) if !otp.to_str().unwrap_or("").is_empty() => {
-                oh.factor_otp(username, otp.to_str().unwrap_or(""))
+            Ok(Some(otp)) if !otp.to_str().unwrap_or_default().is_empty() => {
+                oh.factor_otp(username, otp.to_str().unwrap_or_default())
             }
             Ok(_) => oh.factor_push(username),
             Err(e) => e,
