@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - `debug` config flag
+- Number Challenge handling
 
 ### Changed
 - Primary authentication is less hacky.

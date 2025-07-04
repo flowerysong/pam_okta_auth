@@ -261,6 +261,36 @@ impl OktaHandle<'_> {
             }
         }
 
+        if let Some(num_challenge) = resp_json["binding_code"].as_str() {
+            // Unfortunately, OpenSSH authentication doesn't display non-prompt
+            // messages as it goes.
+            if self
+                .pamh
+                .get_service()
+                .unwrap_or_default()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default()
+                == "sshd"
+            {
+                if let Err(e) = self.pamh.conv(
+                    Some(&format!(
+                        "The correct answer is {num_challenge}. Press enter to continue: "
+                    )),
+                    PamMsgStyle::PROMPT_ECHO_OFF,
+                ) {
+                    self.log_error("Number challenge prompt failed to display");
+                    return e;
+                }
+            } else if let Err(e) = self.pamh.conv(
+                Some(&format!("The correct answer is {num_challenge}.")),
+                PamMsgStyle::TEXT_INFO,
+            ) {
+                self.log_error("Number challenge prompt failed to display");
+                return e;
+            }
+        }
+
         let timeout = resp_json["expires_in"].as_u64().unwrap_or(0);
         let interval = std::time::Duration::from_secs(resp_json["interval"].as_u64().unwrap_or(10));
 
