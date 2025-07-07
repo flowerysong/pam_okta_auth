@@ -2,13 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
-
-### Added
-
-### Changed
+## [0.3.1](https://github.com/flowerysong/pam_okta_auth/releases/tag/v0.3.1) - 2025-07-07
 
 ### Fixed
+- The custom User-Agent correctly reflects the name of the software in use.
 
 ## [0.3.0](https://github.com/flowerysong/pam_okta_auth/releases/tag/v0.3.0) - 2025-07-07
 
@@ -18,7 +15,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Primary authentication is less hacky.
-- HTTP requests send a custom User-Agent header instead of the library's.
+- HTTP requests send a custom User-Agent header instead of the library's default.
 
 ## [0.2.0](https://github.com/flowerysong/pam_okta_auth/releases/tag/v0.2.0) - 2025-06-27
 
