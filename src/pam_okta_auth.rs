@@ -77,7 +77,7 @@ impl OktaHandle<'_> {
 
         match uzers::get_user_by_name(username) {
             Some(user) => {
-                for group1 in user.groups().unwrap() {
+                for group1 in user.groups().unwrap_or_default() {
                     let g1 = group1.name().to_str().unwrap_or_default();
                     for group2 in &self.conf.bypass_groups {
                         let g2 = group2.as_str().unwrap_or_default();
