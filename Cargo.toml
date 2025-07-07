@@ -24,6 +24,12 @@ crate-type = ["cdylib", "lib"]
 inherits = "release"
 strip = "none"
 
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+single_match_else = "allow"
+too_many_lines = "allow"
+
 [package.metadata.release]
 push = false
 allow-branch = ["*"]

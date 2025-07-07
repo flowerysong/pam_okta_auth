@@ -331,7 +331,7 @@ impl OktaHandle<'_> {
                     resp_json["error_description"].as_str().unwrap_or_default()
                 ));
                 return PamError::AUTH_ERR;
-            };
+            }
         }
 
         self.send_error("Timed out waiting for acknowledgment");
@@ -350,11 +350,11 @@ impl PamServiceModule for PamOkta {
         let mut oh = OktaHandle {
             pamh: &pamh,
             conf: OktaConfig {
-                host: String::from(""),
-                client_id: String::from(""),
-                client_secret: String::from(""),
+                host: String::new(),
+                client_id: String::new(),
+                client_secret: String::new(),
                 bypass_groups: toml::value::Array::new(),
-                http_proxy: String::from(""),
+                http_proxy: String::new(),
                 debug: false,
             },
             agent: ureq_config_base().build().into(),
@@ -370,7 +370,7 @@ impl PamServiceModule for PamOkta {
         let mut use_first_pass = false;
 
         for arg in args {
-            match arg.split_once("=") {
+            match arg.split_once('=') {
                 Some((k, v)) => match k {
                     "config_file" => {
                         conf_path = String::from(v);
