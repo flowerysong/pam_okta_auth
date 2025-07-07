@@ -26,6 +26,7 @@ strip = "none"
 
 [package.metadata.release]
 push = false
+allow-branch = ["*"]
 pre-release-commit-message = "chore: bump version to {{version}}"
 pre-release-replacements = [
     { file = "Makefile", search = "target/package/pam_okta_auth-[a-z0-9\\.-]+.crate", replace = "target/package/pam_okta_auth-{{version}}.crate", prerelease = true } ,
