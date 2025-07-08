@@ -118,15 +118,12 @@ impl OktaHandle<'_> {
             ("otp", otp),
         ];
 
-        match &self.mfa_token {
-            Some(tok) => {
-                form_data.push(("grant_type", "http://auth0.com/oauth/grant-type/mfa-otp"));
-                form_data.push(("mfa_token", tok.as_str()));
-            }
-            None => {
-                form_data.push(("grant_type", "urn:okta:params:oauth:grant-type:otp"));
-                form_data.push(("login_hint", username));
-            }
+        if let Some(tok) = &self.mfa_token {
+            form_data.push(("grant_type", "http://auth0.com/oauth/grant-type/mfa-otp"));
+            form_data.push(("mfa_token", tok.as_str()));
+        } else {
+            form_data.push(("grant_type", "urn:okta:params:oauth:grant-type:otp"));
+            form_data.push(("login_hint", username));
         }
 
         match self.agent.post(&url).send_form(form_data) {
@@ -206,19 +203,16 @@ impl OktaHandle<'_> {
             ("channel_hint", "push"),
         ];
 
-        match &self.mfa_token {
-            Some(tok) => {
-                push_url.push_str("challenge");
-                form_data.push((
-                    "challenge_types_supported",
-                    "http://auth0.com/oauth/grant-type/mfa-oob",
-                ));
-                form_data.push(("mfa_token", tok.as_str()));
-            }
-            None => {
-                push_url.push_str("oob-authenticate");
-                form_data.push(("login_hint", username));
-            }
+        if let Some(tok) = &self.mfa_token {
+            push_url.push_str("challenge");
+            form_data.push((
+                "challenge_types_supported",
+                "http://auth0.com/oauth/grant-type/mfa-oob",
+            ));
+            form_data.push(("mfa_token", tok.as_str()));
+        } else {
+            push_url.push_str("oob-authenticate");
+            form_data.push(("login_hint", username));
         }
 
         let resp_json: serde_json::Value = match self.agent.post(&push_url).send_form(form_data) {
@@ -255,14 +249,11 @@ impl OktaHandle<'_> {
             ),
         ];
 
-        match &self.mfa_token {
-            Some(tok) => {
-                form_data.push(("grant_type", "http://auth0.com/oauth/grant-type/mfa-oob"));
-                form_data.push(("mfa_token", tok.as_str()));
-            }
-            None => {
-                form_data.push(("grant_type", "urn:okta:params:oauth:grant-type:oob"));
-            }
+        if let Some(tok) = &self.mfa_token {
+            form_data.push(("grant_type", "http://auth0.com/oauth/grant-type/mfa-oob"));
+            form_data.push(("mfa_token", tok.as_str()));
+        } else {
+            form_data.push(("grant_type", "urn:okta:params:oauth:grant-type:oob"));
         }
 
         if let Some(num_challenge) = resp_json["binding_code"].as_str() {
