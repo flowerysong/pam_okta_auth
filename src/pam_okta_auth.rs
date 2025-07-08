@@ -96,11 +96,8 @@ impl OktaHandle<'_> {
     fn configure_agent(&mut self) {
         if !self.conf.http_proxy.is_empty() {
             let proxy = ureq::Proxy::new(&self.conf.http_proxy);
-            if proxy.is_ok() {
-                self.agent = ureq_config_base()
-                    .proxy(Some(proxy.unwrap()))
-                    .build()
-                    .into();
+            if let Ok(proxy_val) = proxy {
+                self.agent = ureq_config_base().proxy(Some(proxy_val)).build().into();
             } else {
                 self.log_info(&format!(
                     "Ignoring invalid HTTP proxy: {}",
@@ -408,7 +405,12 @@ impl PamServiceModule for PamOkta {
             }
         };
 
-        oh.conf = toml::from_str(&conf_file).unwrap();
+        if let Ok(conf) = toml::from_str(&conf_file) {
+            oh.conf = conf;
+        } else {
+            oh.log_error("unexpected error parsing config file");
+            return PamError::SERVICE_ERR;
+        }
         oh.configure_agent();
 
         if password_auth {
