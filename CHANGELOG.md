@@ -2,13 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
-
-### Added
+## [0.3.2](https://github.com/flowerysong/pam_okta_auth/releases/tag/v0.3.2) - 2025-07-10
 
 ### Changed
-
-### Fixed
+- Smaller dependency tree from version bump to toml 0.9.
 
 ## [0.3.1](https://github.com/flowerysong/pam_okta_auth/releases/tag/v0.3.1) - 2025-07-07
 
