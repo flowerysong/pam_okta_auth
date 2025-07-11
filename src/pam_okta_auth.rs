@@ -164,7 +164,6 @@ impl OktaHandle<'_> {
             }
             Ok(mut resp) => {
                 self.log_error(&format!("HTTP {}", resp.status()));
-                self.log_debug(&resp.body_mut().read_to_string().unwrap_or_default());
                 match resp.body_mut().read_json() {
                     Ok(res) => res,
                     Err(_) => {

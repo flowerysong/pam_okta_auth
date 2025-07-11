@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 ### Fixed
+- Password authentication with second factor.
 
 ## [0.3.2](https://github.com/flowerysong/pam_okta_auth/releases/tag/v0.3.2) - 2025-07-10
 
