@@ -107,6 +107,52 @@ impl OktaHandle<'_> {
         }
     }
 
+    fn poll_for_token(
+        &self,
+        form_data: &[(&str, &str)],
+        interval: std::time::Duration,
+        timeout: u64,
+    ) -> Result<serde_json::Value, PamError> {
+        let token_url = format!("https://{}/oauth2/v1/token", self.conf.host);
+        let now = std::time::Instant::now();
+
+        while now.elapsed().as_secs() <= timeout {
+            std::thread::sleep(interval);
+
+            let resp_json: serde_json::Value =
+                match self.agent.post(&token_url).send_form(form_data.to_owned()) {
+                    Ok(mut resp) if resp.status().is_success() => {
+                        if let Ok(res) = resp.body_mut().read_json() {
+                            return Ok(res);
+                        }
+                        return Err(PamError::AUTH_ERR);
+                    }
+                    Ok(mut resp) => {
+                        self.log_debug(&format!("HTTP {}", resp.status()));
+                        match resp.body_mut().read_json() {
+                            Ok(res) => res,
+                            Err(_) => {
+                                continue;
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        continue;
+                    }
+                };
+
+            if resp_json["error"].as_str().unwrap_or_default() == "invalid_grant" {
+                self.send_error(&format!(
+                    "Polling failed: {}",
+                    resp_json["error_description"].as_str().unwrap_or_default()
+                ));
+                return Err(PamError::AUTH_ERR);
+            }
+        }
+
+        Err(PamError::AUTH_ERR)
+    }
+
     fn factor_otp(&self, username: &str, otp: &str) -> PamError {
         self.log_info(&format!("Attempting OTP authentication for {username}"));
 
@@ -235,9 +281,6 @@ impl OktaHandle<'_> {
 
         self.send_info("Successfully initiated Okta push");
 
-        let now = std::time::Instant::now();
-        let token_url = format!("https://{}/oauth2/v1/token", self.conf.host);
-
         let mut form_data = vec![
             ("client_id", self.conf.client_id.as_str()),
             ("client_secret", self.conf.client_secret.as_str()),
@@ -288,41 +331,13 @@ impl OktaHandle<'_> {
         let timeout = resp_json["expires_in"].as_u64().unwrap_or(0);
         let interval = std::time::Duration::from_secs(resp_json["interval"].as_u64().unwrap_or(10));
 
-        while now.elapsed().as_secs() <= timeout {
-            std::thread::sleep(interval);
-
-            let resp_json: serde_json::Value =
-                match self.agent.post(&token_url).send_form(form_data.clone()) {
-                    Ok(resp) if resp.status().is_success() => {
-                        self.send_info("Push acknowledged");
-                        return PamError::SUCCESS;
-                    }
-                    Ok(mut resp) => {
-                        self.log_debug(&format!("HTTP {}", resp.status()));
-                        self.log_debug(&resp.body_mut().read_to_string().unwrap_or_default());
-                        match resp.body_mut().read_json() {
-                            Ok(res) => res,
-                            Err(_) => {
-                                continue;
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        continue;
-                    }
-                };
-
-            if resp_json["error"].as_str().unwrap_or_default() == "invalid_grant" {
-                self.send_error(&format!(
-                    "Push failed: {}",
-                    resp_json["error_description"].as_str().unwrap_or_default()
-                ));
-                return PamError::AUTH_ERR;
+        match self.poll_for_token(&form_data, interval, timeout) {
+            Ok(_) => {
+                self.send_info("Push acknowledged");
+                PamError::SUCCESS
             }
+            Err(e) => e,
         }
-
-        self.send_error("Timed out waiting for acknowledgment");
-        PamError::AUTHINFO_UNAVAIL
     }
 }
 
