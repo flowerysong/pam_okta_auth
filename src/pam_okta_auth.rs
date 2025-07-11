@@ -169,6 +169,107 @@ impl OktaHandle<'_> {
         Err(PamError::AUTH_ERR)
     }
 
+    fn factor_device(&self, username: &str) -> PamError {
+        let form_data = vec![
+            ("client_id", self.conf.client_id.as_str()),
+            ("client_secret", self.conf.client_secret.as_str()),
+            ("scope", "openid profile"),
+        ];
+
+        let resp_json = match self.post("device/authorize", &form_data, true) {
+            Ok((true, Some(res))) => {
+                self.log_info("Device authorization step 1 success");
+                res
+            }
+            Ok(_) => {
+                self.send_error("Device authorization step 1 failed");
+                return PamError::AUTHINFO_UNAVAIL;
+            }
+            Err(e) => {
+                self.log_error(&e.to_string());
+                self.send_error("Device authorization step 1 failed");
+                return PamError::AUTHINFO_UNAVAIL;
+            }
+        };
+
+        let login_url = resp_json["verification_uri_complete"]
+            .as_str()
+            .unwrap_or_default();
+
+        let mut prompt = format!("Okta device authorization:\n\nLog in at {login_url}");
+
+        if let Ok(qr) = qrcode::QrCode::new(login_url) {
+            prompt.push('\n');
+            prompt += &qr.render::<qrcode::render::unicode::Dense1x2>().build();
+        }
+
+        if let Err(e) = self.send_important_info(&prompt) {
+            self.log_error("Device authorization prompt failed to display");
+            return e;
+        }
+
+        let form_data = vec![
+            ("client_id", self.conf.client_id.as_str()),
+            ("client_secret", self.conf.client_secret.as_str()),
+            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+            (
+                "device_code",
+                resp_json["device_code"].as_str().unwrap_or_default(),
+            ),
+        ];
+
+        let timeout = resp_json["expires_in"].as_u64().unwrap_or(0);
+        let interval = std::time::Duration::from_secs(resp_json["interval"].as_u64().unwrap_or(10));
+
+        let resp_json = match self.poll_for_token(&form_data, interval, timeout) {
+            Ok(res) => res,
+            Err(e) => {
+                return e;
+            }
+        };
+
+        let url = format!("https://{}/oauth2/v1/userinfo", self.conf.host);
+        let auth = format!(
+            "Bearer {}",
+            resp_json["access_token"].as_str().unwrap_or_default()
+        );
+
+        let resp_json: serde_json::Value =
+            match self.agent.get(&url).header("Authorization", &auth).call() {
+                Ok(mut resp) if resp.status().is_success() => {
+                    self.log_info("Device authorization step 3 success");
+                    match resp.body_mut().read_json() {
+                        Ok(res) => res,
+                        Err(_) => {
+                            self.send_error("Device authorization step 3 failed");
+                            return PamError::AUTHINFO_UNAVAIL;
+                        }
+                    }
+                }
+                Ok(mut resp) => {
+                    self.log_error(&format!("HTTP {}", resp.status()));
+                    self.log_debug(&resp.body_mut().read_to_string().unwrap_or_default());
+                    return PamError::AUTHINFO_UNAVAIL;
+                }
+                Err(e) => {
+                    self.log_error(&e.to_string());
+                    self.send_error("Device authorization step 3 failed");
+                    return PamError::AUTHINFO_UNAVAIL;
+                }
+            };
+
+        if let Some(authuser) = resp_json["preferred_username"].as_str() {
+            if authuser == username {
+                return PamError::SUCCESS;
+            }
+            self.log_error(&format!(
+                "Unexpected user: {authuser} instead of {username}"
+            ));
+        }
+
+        PamError::AUTH_ERR
+    }
+
     fn factor_otp(&self, username: &str, otp: &str) -> PamError {
         self.log_info(&format!("Attempting OTP authentication for {username}"));
 
@@ -433,10 +534,16 @@ impl PamServiceModule for PamOkta {
             Some("Okta passcode (leave blank to initiate a push): "),
             PamMsgStyle::PROMPT_ECHO_ON,
         ) {
-            Ok(Some(otp)) if !otp.to_str().unwrap_or_default().is_empty() => {
-                oh.factor_otp(username, otp.to_str().unwrap_or_default())
+            Ok(res) => {
+                let otp = res.unwrap_or_default().to_str().unwrap_or_default();
+                if otp == "dev" {
+                    oh.factor_device(username)
+                } else if !otp.is_empty() {
+                    oh.factor_otp(username, otp)
+                } else {
+                    oh.factor_push(username)
+                }
             }
-            Ok(_) => oh.factor_push(username),
             Err(e) => e,
         }
     }

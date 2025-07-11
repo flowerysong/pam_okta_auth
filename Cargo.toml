@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 pamsm = { version = "0.5", features = ["libpam"] }
+qrcode = { version = "0.14", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = { version = "0.9", features = ["parse", "serde"], default-features = false }
