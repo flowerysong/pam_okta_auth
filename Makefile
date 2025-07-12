@@ -1,3 +1,9 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: © 2025 Regents of The University of Michigan
+#
+# This file is part of pam_okta_auth and is distributed under the terms of
+# the MIT license.
+
 TARGET_PROFILE = release
 INSTALL = install -p
 
@@ -11,10 +17,10 @@ prefix = /usr/local
 
 .PHONY: build deb doc install package rpm selinux
 
-all: build selinux COPYING.dependencies
+all: build selinux LICENSES.dependencies
 
-COPYING.dependencies: Cargo.lock
-	env RUSTC_BOOTSTRAP=1 cargo tree -Z avoid-dev-deps --edges no-build,no-dev,no-proc-macro --no-dedupe --prefix none --format "{l}: {p}" | sed -e "s: ($(pwd)[^)]*)::g" -e "s: / :/:g" -e "s:/: OR :g" | sort -u > COPYING.dependencies
+LICENSES.dependencies: Cargo.lock
+	env RUSTC_BOOTSTRAP=1 cargo tree -Z avoid-dev-deps --edges no-build,no-dev,no-proc-macro --no-dedupe --prefix none --format "{l}: {p}" | sed -e "s: ($(pwd)[^)]*)::g" -e "s: / :/:g" -e "s:/: OR :g" | sort -u > LICENSES.dependencies
 
 doc/pam_okta_auth.8.md: doc/pam_okta_auth.8
 	mandoc doc/pam_okta_auth.8 -T markdown > doc/pam_okta_auth.8.md

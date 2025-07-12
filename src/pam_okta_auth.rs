@@ -1,7 +1,8 @@
-/* This file is part of pam_okta_auth and is distributed under the
- * terms of the MIT license.
- * See COPYING.
- */
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: © 2025 Regents of The University of Michigan
+//
+// This file is part of pam_okta_auth and is distributed under the terms of
+// the MIT license.
 
 use std::os::unix::fs::PermissionsExt;
 

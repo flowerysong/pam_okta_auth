@@ -1,3 +1,10 @@
+<!--
+SPDX-License-Identifier: MIT
+SPDX-FileCopyrightText: © 2025 Regents of The University of Michigan
+
+This file is part of pam_okta_auth and is distributed under the terms of
+the MIT license.
+-->
 # pam\_okta\_auth
 
 [![build status](https://github.com/flowerysong/pam_okta_auth/actions/workflows/build.yml/badge.svg)](https://github.com/flowerysong/pam_okta_auth/actions/workflows/build.yml) [![dependencies status](https://github.com/flowerysong/pam_okta_auth/actions/workflows/dependencies.yml/badge.svg)](https://github.com/flowerysong/pam_okta_auth/actions/workflows/dependencies.yml)

@@ -1,4 +1,5 @@
 *.swp
 COPYING.dependencies
+LICENSES.dependencies
 deb/
 target/

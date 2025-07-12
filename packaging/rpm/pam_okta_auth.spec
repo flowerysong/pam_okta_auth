@@ -1,3 +1,9 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: © 2025 Regents of The University of Michigan
+#
+# This file is part of pam_okta_auth and is distributed under the terms of
+# the MIT license.
+
 %global selinuxtype targeted
 %global moduletype contrib
 %global modulename pam_okta_auth
@@ -51,7 +57,7 @@ make TARGET_PROFILE=rpm
     datarootdir=%{_datarootdir}
 
 %files
-%license COPYING COPYING.dependencies
+%license LICENSE LICENSES.dependencies
 %doc README.md CHANGELOG.md
 %{_mandir}/man8/pam_okta_auth.8*
 %defattr(-,root,root)
