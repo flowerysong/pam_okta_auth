@@ -79,4 +79,4 @@ PAM(8)
 
 pam.conf(5)
 
-pam\_okta\_auth 0.3.3-alpha.1 - 2025-07-10
+pam\_okta\_auth 0.3.3 - 2025-07-12
