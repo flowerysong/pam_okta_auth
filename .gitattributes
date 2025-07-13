@@ -1,0 +1,2 @@
+# github-linguist mistakenly detects this as Ruby
+*.spec linguist-language=RPM_Spec
