@@ -108,39 +108,57 @@ impl OktaHandle<'_> {
         }
     }
 
+    fn post(
+        &self,
+        endpoint: &str,
+        form_data: &[(&str, &str)],
+        log_http_errors: bool,
+    ) -> Result<(bool, Option<serde_json::Value>), ureq::Error> {
+        let url = format!("https://{}/oauth2/v1/{endpoint}", self.conf.host);
+
+        let mut resp = self.agent.post(&url).send_form(form_data.to_owned())?;
+        if log_http_errors && !resp.status().is_success() {
+            self.log_error(&format!("HTTP {}", resp.status()));
+        } else {
+            self.log_debug(&format!("HTTP {}", resp.status()));
+        }
+
+        match resp.body_mut().read_json::<serde_json::Value>() {
+            Ok(res) => {
+                self.log_debug(&res.to_string());
+                Ok((resp.status().is_success(), Some(res)))
+            }
+            Err(e) => {
+                self.log_info(&e.to_string());
+                Ok((resp.status().is_success(), None))
+            }
+        }
+    }
+
     fn poll_for_token(
         &self,
         form_data: &[(&str, &str)],
         interval: std::time::Duration,
         timeout: u64,
     ) -> Result<serde_json::Value, PamError> {
-        let token_url = format!("https://{}/oauth2/v1/token", self.conf.host);
         let now = std::time::Instant::now();
 
         while now.elapsed().as_secs() <= timeout {
             std::thread::sleep(interval);
 
-            let resp_json: serde_json::Value =
-                match self.agent.post(&token_url).send_form(form_data.to_owned()) {
-                    Ok(mut resp) if resp.status().is_success() => {
-                        if let Ok(res) = resp.body_mut().read_json() {
-                            return Ok(res);
-                        }
-                        return Err(PamError::AUTH_ERR);
-                    }
-                    Ok(mut resp) => {
-                        self.log_debug(&format!("HTTP {}", resp.status()));
-                        match resp.body_mut().read_json() {
-                            Ok(res) => res,
-                            Err(_) => {
-                                continue;
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        continue;
-                    }
-                };
+            let resp_json = match self.post("token", form_data, false) {
+                Ok((false, Some(res))) => res,
+                Ok((true, Some(res))) => {
+                    return Ok(res);
+                }
+                // HTTP success, but the body was broken
+                Ok((true, None)) => {
+                    return Err(PamError::AUTH_ERR);
+                }
+                Ok((false, None)) | Err(_) => {
+                    continue;
+                }
+            };
 
             if resp_json["error"].as_str().unwrap_or_default() == "invalid_grant" {
                 self.send_error(&format!(
@@ -157,7 +175,6 @@ impl OktaHandle<'_> {
     fn factor_otp(&self, username: &str, otp: &str) -> PamError {
         self.log_info(&format!("Attempting OTP authentication for {username}"));
 
-        let url = format!("https://{}/oauth2/v1/token", self.conf.host);
         let mut form_data = vec![
             ("client_id", self.conf.client_id.as_str()),
             ("client_secret", self.conf.client_secret.as_str()),
@@ -173,14 +190,13 @@ impl OktaHandle<'_> {
             form_data.push(("login_hint", username));
         }
 
-        match self.agent.post(&url).send_form(form_data) {
-            Ok(resp) if resp.status().is_success() => {
+        match self.post("token", &form_data, true) {
+            Ok((true, _)) => {
                 self.send_info("OTP authentication succeeded");
                 PamError::SUCCESS
             }
-            Ok(mut resp) => {
-                self.log_error(&format!("HTTP {}", resp.status()));
-                self.log_debug(&resp.body_mut().read_to_string().unwrap_or_default());
+            Ok((false, _)) => {
+                self.send_error("OTP authentication failed");
                 PamError::AUTH_ERR
             }
             Err(e) => {
@@ -195,7 +211,6 @@ impl OktaHandle<'_> {
         self.log_info(&format!(
             "Attempting password authentication for {username}"
         ));
-        let url = format!("https://{}/oauth2/v1/token", self.conf.host);
         let form_data = [
             ("client_id", self.conf.client_id.as_str()),
             ("client_secret", self.conf.client_secret.as_str()),
@@ -204,20 +219,16 @@ impl OktaHandle<'_> {
             ("username", username),
             ("password", password),
         ];
-        let resp_json: serde_json::Value = match self.agent.post(&url).send_form(form_data) {
-            Ok(resp) if resp.status().is_success() => {
+
+        let resp_json = match self.post("token", &form_data, true) {
+            Ok((true, _)) => {
                 self.send_info("Password authentication succeeded");
                 return Some(PamError::SUCCESS);
             }
-            Ok(mut resp) => {
-                self.log_error(&format!("HTTP {}", resp.status()));
-                match resp.body_mut().read_json() {
-                    Ok(res) => res,
-                    Err(_) => {
-                        self.send_error("Password authentication failed");
-                        return Some(PamError::AUTHINFO_UNAVAIL);
-                    }
-                }
+            Ok((false, Some(res))) => res,
+            Ok((false, None)) => {
+                self.send_error("Password authentication failed");
+                return Some(PamError::AUTHINFO_UNAVAIL);
             }
             Err(e) => {
                 self.log_error(&e.to_string());
@@ -242,7 +253,7 @@ impl OktaHandle<'_> {
     fn factor_push(&self, username: &str) -> PamError {
         self.log_info(&format!("Attempting push authentication for {username}"));
 
-        let mut push_url = format!("https://{}/oauth2/v1/", self.conf.host);
+        let mut push_url = String::new();
         let mut form_data = vec![
             ("client_id", self.conf.client_id.as_str()),
             ("client_secret", self.conf.client_secret.as_str()),
@@ -261,17 +272,9 @@ impl OktaHandle<'_> {
             form_data.push(("login_hint", username));
         }
 
-        let resp_json: serde_json::Value = match self.agent.post(&push_url).send_form(form_data) {
-            Ok(mut resp) if resp.status().is_success() => match resp.body_mut().read_json() {
-                Ok(res) => res,
-                Err(e) => {
-                    self.log_error(&e.to_string());
-                    return PamError::AUTHINFO_UNAVAIL;
-                }
-            },
-            Ok(mut resp) => {
-                self.log_error(&format!("HTTP {}", resp.status()));
-                self.log_debug(&resp.body_mut().read_to_string().unwrap_or_default());
+        let resp_json = match self.post(&push_url, &form_data, true) {
+            Ok((true, Some(res))) => res,
+            Ok(_) => {
                 return PamError::AUTH_ERR;
             }
             Err(e) => {
