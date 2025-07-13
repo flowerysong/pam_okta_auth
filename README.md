@@ -21,14 +21,14 @@ authentication.
 
 ## Deployment
 
-The configuration file, normally located at
+The configuration file, by default located at
 `/etc/security/pam_okta_auth.toml`, uses the [TOML](https://toml.io/)
-format. This file contains secrets, so it must not be world readable.
+format. This file contains secrets so it must not be world readable.
 
 Supported configuration file options and PAM options are documented
-in the [man page](doc/pam_okta_auth.8.md).
+in the [man page](doc/pam_okta_auth8.md).
 
-Okta client credentials are required; these should be for a native
+Okta client credentials are required. These should be for a native
 application with at least the `OTP` and `OOB` direct auth grants.
 
 ![Okta application settings](doc/okta_app_grants.png)
@@ -55,9 +55,9 @@ auth        required        pam_okta_auth.so
 ## Deployment As Primary Authentication
 
 The password authentication flow requires client credentials for an
-app with at least the `Resource Owner Password` grant; depending on
-the authentication policy assigned to the app it may also need the
-`MFA OTP` and `MFA OOB` grants.
+app with at least the `Resource Owner Password` grant; if the the
+authentication policy assigned to the app requires MFA it will also
+need the `MFA OTP` and `MFA OOB` grants.
 
 This flow currently assumes that OTP (passcode) and push
 authentication are always acceptable second factors when MFA is
