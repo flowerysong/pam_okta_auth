@@ -71,6 +71,28 @@ impl OktaHandle<'_> {
         let _ = self.pamh.conv(Some(msg), PamMsgStyle::TEXT_INFO);
     }
 
+    fn send_important_info(&self, msg: &str) -> Result<(), PamError> {
+        // Unfortunately, OpenSSH authentication doesn't display non-prompt
+        // messages as it goes so we have to display a useless prompt.
+        if self
+            .pamh
+            .get_service()
+            .unwrap_or_default()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            == "sshd"
+        {
+            self.pamh.conv(
+                Some(&format!("{msg}\nPress enter to continue: ")),
+                PamMsgStyle::PROMPT_ECHO_OFF,
+            )?;
+        } else {
+            self.pamh.conv(Some(msg), PamMsgStyle::TEXT_INFO)?;
+        }
+        Ok(())
+    }
+
     fn check_bypass_groups(&self, username: &str) -> Option<PamError> {
         if self.conf.bypass_groups.is_empty() {
             return None;
@@ -301,30 +323,9 @@ impl OktaHandle<'_> {
         }
 
         if let Some(num_challenge) = resp_json["binding_code"].as_str() {
-            // Unfortunately, OpenSSH authentication doesn't display non-prompt
-            // messages as it goes.
-            if self
-                .pamh
-                .get_service()
-                .unwrap_or_default()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or_default()
-                == "sshd"
+            if let Err(e) =
+                self.send_important_info(&format!("The correct answer is {num_challenge}"))
             {
-                if let Err(e) = self.pamh.conv(
-                    Some(&format!(
-                        "The correct answer is {num_challenge}. Press enter to continue: "
-                    )),
-                    PamMsgStyle::PROMPT_ECHO_OFF,
-                ) {
-                    self.log_error("Number challenge prompt failed to display");
-                    return e;
-                }
-            } else if let Err(e) = self.pamh.conv(
-                Some(&format!("The correct answer is {num_challenge}.")),
-                PamMsgStyle::TEXT_INFO,
-            ) {
                 self.log_error("Number challenge prompt failed to display");
                 return e;
             }
