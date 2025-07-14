@@ -26,8 +26,6 @@ struct OktaConfig {
     client_id: String,
     client_secret: String,
     #[serde(default)]
-    bypass_groups: toml::value::Array,
-    #[serde(default)]
     http_proxy: String,
     #[serde(default)]
     debug: bool,
@@ -91,27 +89,6 @@ impl OktaHandle<'_> {
             self.pamh.conv(Some(msg), PamMsgStyle::TEXT_INFO)?;
         }
         Ok(())
-    }
-
-    fn check_bypass_groups(&self, username: &str) -> Option<PamError> {
-        if self.conf.bypass_groups.is_empty() {
-            return None;
-        }
-
-        let user = uzers::get_user_by_name(username)?;
-        for group in user.groups()? {
-            let group_name = group.name().to_str()?;
-            if self
-                .conf
-                .bypass_groups
-                .iter()
-                .any(|e| e.as_str().unwrap_or_default() == group_name)
-            {
-                self.log_info(&format!("User is in bypass group {group_name}"));
-                return Some(PamError::SUCCESS);
-            }
-        }
-        None
     }
 
     fn configure_agent(&mut self) {
@@ -358,7 +335,6 @@ impl PamServiceModule for PamOkta {
                 host: String::new(),
                 client_id: String::new(),
                 client_secret: String::new(),
-                bypass_groups: toml::value::Array::new(),
                 http_proxy: String::new(),
                 debug: false,
             },
@@ -446,12 +422,6 @@ impl PamServiceModule for PamOkta {
                 if let Some(res) = oh.factor_password(username, password) {
                     return res;
                 }
-            }
-        }
-
-        if oh.mfa_token.is_none() {
-            if let Some(res) = oh.check_bypass_groups(username) {
-                return res;
             }
         }
 

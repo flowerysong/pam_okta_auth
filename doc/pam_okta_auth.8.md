@@ -60,11 +60,6 @@ authenticates users against the Okta authentication service.
 
 > OAuth2 client secret (required)
 
-**bypass\_groups**
-
-> List of groups whose members are not required to provide a secondary factor.
-> This setting does not have an effect if primary authentication is enabled.
-
 **debug**
 
 > Boolean flag to enable increased log verbosity.

@@ -62,6 +62,18 @@ returns from the module:
 auth        [success=ok ignore=ignore authinfo_unavail=ignore service_err=ignore default=bad]   pam_okta_auth.so
 ```
 
+`pam_duo` allows you to use a custom pattern language in its
+configuration file to specify which groups should be required to
+use Duo authentication. There is no equivalent functionality in
+`pam_okta_auth`, but you can achieve similar configurations using
+features available in the `Linux-PAM` stack.
+
+```
+# Only require Okta authentication for staff who aren't in the bypass group
+auth    [default=1 ignore=ignore success=ignore]  pam_succeed_if.so quiet user ingroup staff user notingroup bypass
+auth    required                    pam_okta_auth.so
+```
+
 ## Deployment As Primary Authentication
 
 The password authentication flow requires client credentials for an
