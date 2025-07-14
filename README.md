@@ -46,10 +46,20 @@ client_id = "0deadgoffdeADGOffick"
 client_secret = "6zFfFfffzfZFz6zFZFzzFZFZFfZf6Fz6F6ZfZ6f-FFFzZZ6FZ_zZFzFZ6fFzfFFz"
 ```
 
-### Example PAM config
+### Example PAM configurations
 
 ```
 auth        required        pam_okta_auth.so
+```
+
+`pam_duo` has a flag to "fail safe" and return `success` when there
+is a configuration issue or the Duo service is unavailable. There is
+no corresponding `pam_okta_auth` configuration—you can instead use
+`Linux-PAM` controls to ignore the `service_err` and/or `authinfo_unavail`
+returns from the module:
+
+```
+auth        [success=ok ignore=ignore authinfo_unavail=ignore service_err=ignore default=bad]   pam_okta_auth.so
 ```
 
 ## Deployment As Primary Authentication

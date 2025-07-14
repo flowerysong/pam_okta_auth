@@ -173,7 +173,7 @@ impl OktaHandle<'_> {
                 }
                 // HTTP success, but the body was broken
                 Ok((true, None)) => {
-                    return Err(PamError::AUTH_ERR);
+                    return Err(PamError::AUTHINFO_UNAVAIL);
                 }
                 Ok((false, None)) | Err(_) => {
                     continue;
@@ -222,7 +222,7 @@ impl OktaHandle<'_> {
             Err(e) => {
                 self.log_error(&e.to_string());
                 self.send_error("OTP authentication failed");
-                PamError::AUTH_ERR
+                PamError::AUTHINFO_UNAVAIL
             }
         }
     }
@@ -295,11 +295,11 @@ impl OktaHandle<'_> {
         let resp_json = match self.post(&push_url, &form_data, true) {
             Ok((true, Some(res))) => res,
             Ok(_) => {
-                return PamError::AUTH_ERR;
+                return PamError::AUTHINFO_UNAVAIL;
             }
             Err(e) => {
                 self.log_error(&e.to_string());
-                return PamError::AUTH_ERR;
+                return PamError::AUTHINFO_UNAVAIL;
             }
         };
 
@@ -348,7 +348,7 @@ impl PamServiceModule for PamOkta {
     fn authenticate(pamh: Pam, _: PamFlags, args: Vec<String>) -> PamError {
         let username = match pamh.get_user(None) {
             Ok(Some(user)) => user.to_str().unwrap_or_default(),
-            Ok(None) => return PamError::USER_UNKNOWN,
+            Ok(None) => return PamError::SERVICE_ERR,
             Err(e) => return e,
         };
 
