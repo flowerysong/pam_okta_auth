@@ -76,20 +76,18 @@ impl OktaHandle<'_> {
             return None;
         }
 
-        match uzers::get_user_by_name(username) {
-            Some(user) => {
-                for group1 in user.groups().unwrap_or_default() {
-                    let g1 = group1.name().to_str().unwrap_or_default();
-                    for group2 in &self.conf.bypass_groups {
-                        let g2 = group2.as_str().unwrap_or_default();
-                        if g1 == g2 {
-                            self.log_info(&format!("User is in bypass group {g2}"));
-                            return Some(PamError::SUCCESS);
-                        }
-                    }
-                }
+        let user = uzers::get_user_by_name(username)?;
+        for group in user.groups()? {
+            let group_name = group.name().to_str()?;
+            if self
+                .conf
+                .bypass_groups
+                .iter()
+                .any(|e| e.as_str().unwrap_or_default() == group_name)
+            {
+                self.log_info(&format!("User is in bypass group {group_name}"));
+                return Some(PamError::SUCCESS);
             }
-            None => return Some(PamError::USER_UNKNOWN),
         }
         None
     }
