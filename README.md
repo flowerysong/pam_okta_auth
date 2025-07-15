@@ -13,11 +13,55 @@ Okta authentication for Unix systems.
 
 ![animated demo](doc/pam_okta_auth.gif)
 
-pam\_okta\_auth is a Pluggable Authentication Modules (PAM)
+`pam_okta_auth` is a Pluggable Authentication Modules (PAM)
 module designed to provide secondary authentication similar to
-[duo\_unix](https://github.com/duosecurity/duo_unix) using Okta.
+[`duo_unix`](https://github.com/duosecurity/duo_unix) using Okta.
 It also has experimental support for password-based primary
 authentication.
+
+## Dependencies
+
+`pam_okta_auth` is developed and used mainly on Linux systems using
+[Linux-PAM](https://github.com/linux-pam/linux-pam), but should be
+compatible with other Unix-like systems and PAM implementations.
+
+In order to build `pam_okta_auth` you will need the following:
+
+* A [Rust](https://www.rust-lang.org/) compiler with support for the 2021 edition of Rust.
+* [Cargo](https://doc.rust-lang.org/cargo/)
+* PAM
+
+You can install these dependencies on most RPM-based systems by running
+`dnf install pam-devel rust-toolset`,  and on Debian by running
+`apt install libpam-dev rust-all`.
+
+## Installation
+
+Prebuilt RPM and deb packages are published via [GitHub
+Releases](https://github.com/flowerysong/pam_okta_auth/releases/latest).
+
+Example installation process for RHEL:
+```
+dnf install https://github.com/flowerysong/pam_okta_auth/releases/download/v0.1.3/pam_okta_auth-0.1.3-1.el9.x86_64.rpm https://github.com/flowerysong/pam_okta_auth/releases/download/v0.1.3/pam_okta_auth-selinux-0.1.3-1.el9.noarch.rpm
+```
+
+Example installation process for Ubuntu:
+```
+wget https://github.com/flowerysong/pam_okta_auth/releases/download/v0.1.3/pam_okta_auth_0.1.3_amd64.deb
+dpkg -i pam_okta_auth_0.1.3_amd64.deb
+```
+
+### Manual Installation
+
+In a git checkout (or a source tree obtained by other methods):
+```
+cargo build --locked --profile release
+sudo install -m 0755 target/release/libpam_okta_auth.so /usr/lib/security/pam_okta_auth.so
+```
+
+`/usr/lib/security` is probably not the correct installation path for
+your system. You should figure out where PAM expects modules to live
+and adjust your process accordingly.
 
 ## Deployment
 
@@ -26,7 +70,7 @@ The configuration file, by default located at
 format. This file contains secrets so it must not be world readable.
 
 Supported configuration file options and PAM options are documented
-in the [man page](doc/pam_okta_auth8.md).
+in the [man page](doc/pam_okta_auth.8.md).
 
 Okta client credentials are required. These should be for a native
 application with at least the `OTP` and `OOB` direct auth grants.
@@ -38,7 +82,7 @@ permits authentication with a single factor.
 
 ![Okta authentication policy](doc/okta_policy.png)
 
-### Example Config File
+### Example Configuration File
 
 ```toml
 host = "example.oktapreview.com"
@@ -46,10 +90,10 @@ client_id = "0deadgoffdeADGOffick"
 client_secret = "6zFfFfffzfZFz6zFZFzzFZFZFfZf6Fz6F6ZfZ6f-FFFzZZ6FZ_zZFzFZ6fFzfFFz"
 ```
 
-### Example PAM configurations
+### Example PAM Configurations
 
 ```
-auth        required        pam_okta_auth.so
+auth    required    pam_okta_auth.so
 ```
 
 `pam_duo` has a flag to "fail safe" and return `success` when there
@@ -59,7 +103,7 @@ no corresponding `pam_okta_auth` configuration—you can instead use
 returns from the module:
 
 ```
-auth        [success=ok ignore=ignore authinfo_unavail=ignore service_err=ignore default=bad]   pam_okta_auth.so
+auth    [success=ok ignore=ignore authinfo_unavail=ignore service_err=ignore default=bad]   pam_okta_auth.so
 ```
 
 `pam_duo` allows you to use a custom pattern language in its
@@ -70,8 +114,8 @@ features available in the `Linux-PAM` stack.
 
 ```
 # Only require Okta authentication for staff who aren't in the bypass group
-auth    [default=1 ignore=ignore success=ignore]  pam_succeed_if.so quiet user ingroup staff user notingroup bypass
-auth    required                    pam_okta_auth.so
+auth    [default=1 ignore=ignore success=ignore]    pam_succeed_if.so quiet user ingroup staff user notingroup bypass
+auth    required                                    pam_okta_auth.so
 ```
 
 ## Deployment As Primary Authentication
