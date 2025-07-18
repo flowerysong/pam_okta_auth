@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Added
+
+### Changed
+
+### Fixed
+
 ## [0.4.0](https://github.com/flowerysong/pam_okta_auth/releases/tag/v0.4.0) - 2025-07-18
 
 ### Added
