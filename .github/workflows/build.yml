@@ -9,12 +9,17 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   rustfmt:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install rustfmt
         run: |
@@ -32,6 +37,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install rustfmt
         run: |
@@ -46,6 +53,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install build dependencies
         run: |
@@ -131,7 +140,7 @@ jobs:
           merge-multiple: true
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
         with:
           draft: true
           files: |
