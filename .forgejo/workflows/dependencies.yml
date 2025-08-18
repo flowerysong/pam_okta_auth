@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: © 2025 Regents of The University of Michigan
+#
+# This file is part of pam_okta_auth and is distributed under the terms of
+# the MIT license.
+
+name: dependencies
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install rust toolchain
+        uses: https://github.com/dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+        with:
+          toolchain: 1.84.1
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-dev
+
+      - name: Check for dependency updates
+        run: |
+          cargo update
+          git status --porcelain | grep -q '^ M' && cargo build
+          git diff
+          git status --porcelain | grep -q '^ M' && exit 1 || exit 0

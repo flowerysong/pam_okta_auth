@@ -1,0 +1,145 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: © 2025 Regents of The University of Michigan
+#
+# This file is part of pam_okta_auth and is distributed under the terms of
+# the MIT license.
+
+name: build
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install rust toolchain
+        uses: https://github.com/dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+        with:
+          toolchain: 1.84.1
+
+      - name: Check code formatting
+        run: |
+          rustup component add rustfmt
+          cargo fmt
+          git diff
+          git status --porcelain | grep -q '^ M' && exit 1 || exit 0
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install rust toolchain
+        uses: https://github.com/dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+        with:
+          toolchain: 1.84.1
+
+      - name: Run clippy
+        run: |
+          rustup component add clippy
+          cargo clippy -- -D warnings
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install rust toolchain
+        uses: https://github.com/dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+        with:
+          toolchain: 1.84.1
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-dev
+
+      - name: Build package
+        run: cargo package
+
+      - name: Upload package
+        # FIXME: this is a supposedly temporary fork
+        uses: https://data.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          path: target/package/pam_okta_auth-*.crate
+          name: crate
+
+  build-el:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        el_version: [8, 9, 10]
+    runs-on: ubuntu-latest
+    container: almalinux:${{ matrix.el_version }}
+    steps:
+      - name: Enable newer nodejs on EL8
+        run: |
+          [[ ${{ matrix.el_version }} -eq 8 ]] && dnf module enable -y nodejs:22
+          exit 0
+
+      - name: Install build deps
+        run: dnf install -y git gzip make nodejs pam-devel rpmdevtools rust-toolset selinux-policy-devel
+
+      - name: Download package
+        uses: https://data.forgejo.org/forgejo/download-artifact@v4
+        with:
+          name: crate
+
+      - name: Build RPM
+        run: rpmbuild -ta pam_okta_auth-*.crate
+
+      - name: Upload RPM
+        uses: https://data.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: el${{ matrix.el_version }}
+          path: |
+            ~/rpmbuild/RPMS/noarch/*
+            ~/rpmbuild/RPMS/x86_64/*
+            ~/rpmbuild/SRPMS/*
+
+  build-deb:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install rust toolchain
+        uses: https://github.com/dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+        with:
+          toolchain: 1.84.1
+
+      - name: Install build deps
+        run: |
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' > /etc/apt/sources.list.d/goreleaser.list
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-dev make nfpm
+
+      - name: Download package
+        uses: https://data.forgejo.org/forgejo/download-artifact@v4
+        with:
+          name: crate
+
+      - name: Build .deb
+        run: |
+          tar --strip-components=1 -xvaf pam_okta_auth-*.crate
+          make deb
+
+      - name: Upload .deb
+        uses: https://data.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: deb
+          path: deb/*
