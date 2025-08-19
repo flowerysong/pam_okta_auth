@@ -157,7 +157,7 @@ impl OktaHandle<'_> {
                 }
             };
 
-            if resp_json["error"].as_str().unwrap_or_default() == "invalid_grant" {
+            if resp_json["error"].as_str().unwrap_or_default() != "authorization_pending" {
                 self.send_error(&format!(
                     "Polling failed: {}",
                     resp_json["error_description"].as_str().unwrap_or_default()
