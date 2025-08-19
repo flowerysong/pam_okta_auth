@@ -129,3 +129,17 @@ This flow currently assumes that OTP (passcode) and push
 authentication are always acceptable second factors when MFA is
 required. It's still possible to apply a policy where only one of them
 is allowed, but the end user experience is not ideal.
+
+## SSH Login Timeouts
+
+While Okta out-of-band authentication normally gives users several
+minutes to respond, `OpenSSH` in its default configuration will
+only keep a connection open for 120 seconds without a successful
+authentication. Exceeding this limit will result in the connection
+silently dropping with no useful feedback to the user and no log
+output on the server.
+
+It's a somewhat common recommendation to reduce this timeout, but
+when deploying this software server operators might want to consider
+instead increasing `LoginGraceTime` to give people sufficient time to
+complete the more complex authentication steps.
