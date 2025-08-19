@@ -130,7 +130,9 @@ authentication are always acceptable second factors when MFA is
 required. It's still possible to apply a policy where only one of them
 is allowed, but the end user experience is not ideal.
 
-## SSH Login Timeouts
+## OpenSSH and PAM
+
+### Login Timeouts
 
 While Okta out-of-band authentication normally gives users several
 minutes to respond, `OpenSSH` in its default configuration will
@@ -141,5 +143,27 @@ output on the server.
 
 It's a somewhat common recommendation to reduce this timeout, but
 when deploying this software server operators might want to consider
-instead increasing `LoginGraceTime` to give people sufficient time to
-complete the more complex authentication steps.
+instead restoring the `LoginGraceTime` default, or even increasing
+it to give people sufficient time to complete the more complex
+authentication steps.
+
+### Poor Handling of Informational Messages
+
+There are two known issues with the integration between OpenSSH and
+PAM.
+
+Non-prompt messages are not displayed to the user as they are sent,
+but instead buffered and shown after successful authentication
+(so failed authentications result in the user seeing none of the
+informational output.) There is a patch to fix this behaviour that
+some OpenSSH packagers have applied, but it hasn't been accepted
+upstream. If we have a message like a number challenge that absolutely
+must be displayed to the user, `pam_okta_auth` detects that this
+authentication is being done for `sshd` and sends the message as a
+prompt that the user must then acknowledge by hitting `enter`.
+
+Relatedly, some combinations of client and server configuration and/or
+versions result in the buffered messages being displayed twice. This
+is mainly a cosmetic issue, but can also confuse people. Like the
+other issue, there is a proposed patch fixing this that has not been
+accepted by the OpenSSH maintainers.
