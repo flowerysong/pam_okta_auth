@@ -185,8 +185,8 @@ Successfully initiated Okta push
 Push acknowledged
 ```
 
-Switching to `LogLevel ERROR` results in one copy of each message on
-success… and zero on failure:
+Switching the client to `LogLevel ERROR` results in one copy of each
+message on success… and zero on failure:
 
 ```console
 Okta passcode (leave blank to initiate a push):
