@@ -134,36 +134,63 @@ is allowed, but the end user experience is not ideal.
 
 ### Login Timeouts
 
-While Okta out-of-band authentication normally gives users several
-minutes to respond, `OpenSSH` in its default configuration will
+While Okta out-of-band authentication normally gives users five
+minutes to respond, OpenSSH in its default configuration will
 only keep a connection open for 120 seconds without a successful
 authentication. Exceeding this limit will result in the connection
 silently dropping with no useful feedback to the user and no log
 output on the server.
 
-It's a somewhat common recommendation to reduce this timeout, but
-when deploying this software server operators might want to consider
-instead restoring the `LoginGraceTime` default, or even increasing
-it to give people sufficient time to complete the more complex
-authentication steps.
+The internet likes to recommend reducing the `LoginGraceTime`, but
+when deploying this software you might want to consider increasing
+it instead. Setting it to 330 seconds will give people ample time
+to complete the more complex authentication steps and minimize the
+likelihood of an acknowledged push not resulting in successful
+authentication.
 
 ### Poor Handling of Informational Messages
 
 There are two known issues with the integration between OpenSSH and
 PAM.
 
-Non-prompt messages are not displayed to the user as they are sent,
-but instead buffered and shown after successful authentication
-(so failed authentications result in the user seeing none of the
-informational output.) There is a patch to fix this behaviour that
-some OpenSSH packagers have applied, but it hasn't been accepted
-upstream. If we have a message like a number challenge that absolutely
-must be displayed to the user, `pam_okta_auth` detects that this
-authentication is being done for `sshd` and sends the message as a
-prompt that the user must then acknowledge by hitting `enter`.
+Firstly, non-prompt messages are buffered and shown after authentication
+completes instead of being displayed to the user immediately.
 
-Relatedly, some combinations of client and server configuration and/or
-versions result in the buffered messages being displayed twice. This
-is mainly a cosmetic issue, but can also confuse people. Like the
-other issue, there is a proposed patch fixing this that has not been
-accepted by the OpenSSH maintainers.
+There have been several attempts to fix this behaviour since it was
+reported in [2018](https://bugzilla.mindrot.org/show_bug.cgi?id=2876),
+but none of them have been accepted yet.
+
+Consequently if we have a message—like a number challenge—that
+absolutely must be displayed to the user, `pam_okta_auth` detects that
+this authentication is being done for `sshd` and sends the message as
+a prompt that the user must then acknowledge by hitting `enter`.
+
+Secondly, this buffer accumulates non-prompt messages regardless
+of whether PAM indicates they are errors or information, then logs
+them at the `INFO` level. For successful authentications the client
+also then treats them as a login message returned by the server and
+displays them.
+
+At the default `LogLevel INFO` this results in two copies on
+successful login and one on failure:
+
+```console
+Okta passcode (leave blank to initiate a push):
+Successfully initiated Okta push
+Polling failed: User rejected out-of-band authentication prompt.
+Okta passcode (leave blank to initiate a push):
+Successfully initiated Okta push
+Push acknowledged
+Successfully initiated Okta push
+Push acknowledged
+```
+
+Switching to `LogLevel ERROR` results in one copy of each message on
+success… and zero on failure:
+
+```console
+Okta passcode (leave blank to initiate a push):
+Okta passcode (leave blank to initiate a push):
+Successfully initiated Okta push
+Push acknowledged
+```
