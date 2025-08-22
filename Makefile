@@ -52,7 +52,7 @@ target/pam/pam_okta_auth.pp: target/pam/pam_okta_auth.mod
 selinux: target/pam/pam_okta_auth.pp
 
 rpm: package
-	rpmbuild -ta target/package/pam_okta_auth-0.4.1.crate
+	rpmbuild -ta target/package/pam_okta_auth-0.4.2-alpha.1.crate
 
 deb: build
 	mkdir -p deb
